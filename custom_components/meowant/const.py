@@ -15,6 +15,10 @@ DEFAULT_PRODUCT = "97001"
 
 USER_AGENT = "okhttp/4.10.0"
 
+# Sent as X-UBT-Language on logged-in requests (not login), like the app.
+# The server localizes some fields by it, e.g. cat breed names (Chinese otherwise).
+API_LANGUAGE = "en"
+
 # Matches the AIR PET app.
 LOGIN_METHOD = "PUT"
 
@@ -34,3 +38,7 @@ CONF_AREA_CODE = "area_code"
 
 # --- Coordinator ---
 DEFAULT_UPDATE_INTERVAL = timedelta(seconds=60)
+
+# Records fetched per box per poll (each of cat visits and device events).
+# Enough that a busy minute between polls doesn't drop events.
+RECORDS_PER_POLL = 10

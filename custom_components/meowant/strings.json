@@ -29,5 +29,71 @@
       "already_configured": "This Meowant account is already configured.",
       "reauth_successful": "Re-authentication was successful."
     }
+  },
+  "entity": {
+    "binary_sensor": {
+      "online": {
+        "name": "Online"
+      },
+      "waste_bin_needs_emptying": {
+        "name": "Waste bin needs emptying"
+      },
+      "deodorant_expired": {
+        "name": "Deodorant expired"
+      }
+    },
+    "event": {
+      "activity": {
+        "name": "Activity",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "cat_visit": "Cat visit",
+              "scheduled_clean": "Scheduled clean",
+              "auto_clean": "Clean after visit",
+              "other": "Other"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "waste_bin_level": {
+        "name": "Waste bin level"
+      },
+      "waste_bin_uses": {
+        "name": "Waste bin uses"
+      },
+      "deodorant_days_left": {
+        "name": "Deodorant remaining"
+      },
+      "last_cat_visit": {
+        "name": "Last cat visit"
+      },
+      "last_visit_weight": {
+        "name": "Last visit weight"
+      },
+      "last_visit_duration": {
+        "name": "Last visit duration"
+      },
+      "last_clean": {
+        "name": "Last clean"
+      },
+      "last_device_event": {
+        "name": "Last device event"
+      },
+      "auto_clean_delay": {
+        "name": "Auto-clean delay"
+      },
+      "cat_weight": {
+        "name": "Weight"
+      },
+      "cat_visits_today": {
+        "name": "Visits today"
+      },
+      "cat_time_in_box_today": {
+        "name": "Time in box today"
+      }
+    }
   }
 }

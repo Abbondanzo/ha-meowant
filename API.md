@@ -31,6 +31,9 @@ User-Agent: okhttp/4.10.0
 X-UBT-AppId: <APP_ID>
 X-UBT-DeviceId: <32 hex chars, stable per install>
 X-UBT-Sign: <signature, see below>
+# logged-in requests only:
+authorization: <token>          # raw token, no "Bearer " prefix
+X-UBT-Language: en              # localizes some fields, e.g. cat breed names (Chinese without it)
 # authenticated calls only:
 authorization: <token>          # raw token, no "Bearer " prefix
 product: <PRODUCT>
@@ -219,7 +222,7 @@ Response shapes as returned in `data`. Values are examples; personal fields are 
 - `eventType` 21 = cat visit (`weight` kg, `costTime` s; `catInfoId` 0 = not matched to a cat). 33 = scheduled clean (times match `taskConfigList`). 47 = probably the auto clean after a visit (seen about 5 min after visits). Other codes are unknown.
 - `messageType` 0 returns cat visits and 1 returns device events.
 
-**`cat/info`**: list of cat profiles: `catInfoId`, `nickname`, `gender`, `birthday`, `weight`/`baseWeight` (kg), `icon` (image URL), `catStatus`, `catBreed` `{id, breed, icon}`, `healthAlertConfig`, plus daily counters `number`/`costTime`/`subNumber`/`subCostTime`/`subWeight` and `lastWeigthTimestamp` (sic).
+**`cat/info`**: list of cat profiles: `catInfoId`, `nickname`, `gender`, `birthday`, `weight`/`baseWeight` (kg), `icon` (image URL), `catStatus`, `catBreed` `{id, breed, icon}`, `healthAlertConfig`, plus daily counters `number`/`costTime`/`subNumber`/`subCostTime`/`subWeight` and `lastWeigthTimestamp` (sic). `catBreed.breed` is in Chinese unless the request sends `X-UBT-Language: en`.
 
 ### Write endpoints (authenticated)
 

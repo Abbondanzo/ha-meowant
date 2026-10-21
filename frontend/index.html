@@ -232,6 +232,7 @@
             <label style="flex:1 1 300px">Path <input name="path" placeholder="/catbox-server/box/config/allConfig?serialNumber={serial}" required></label>
           </div>
           <label style="margin-top:8px">JSON body (optional) <textarea name="body" placeholder='{"serialNumber": "{serial}"}'></textarea></label>
+          <label style="margin-top:8px">Extra headers (optional, JSON) <textarea name="headers" style="min-height:44px" placeholder='{"language": "en"}'></textarea></label>
           <div class="toolbar" style="margin-top:10px">
             <button type="submit">Send</button>
             <button type="button" class="secondary" id="format-body">Format body</button>
@@ -642,14 +643,18 @@ document.querySelectorAll("form[data-form]").forEach((form) => {
 const fill = (text) => (text || "").replaceAll("{serial}", serial || "");
 
 async function sendRaw(spec, label) {
-  let body = null;
+  let body = null, headers = null;
   if (spec.body && spec.body.trim()) {
     try { body = JSON.parse(fill(spec.body)); }
     catch { showConsoleResult(label, { ok: false, error: "Body isn't valid JSON" }); return; }
   }
+  if (spec.headers && spec.headers.trim()) {
+    try { headers = JSON.parse(spec.headers); }
+    catch { showConsoleResult(label, { ok: false, error: "Headers aren't valid JSON" }); return; }
+  }
   let result;
   try {
-    result = await api("/api/raw", { method: "POST", body: { method: spec.method, path: fill(spec.path), body } });
+    result = await api("/api/raw", { method: "POST", body: { method: spec.method, path: fill(spec.path), body, headers } });
   } catch (err) {
     result = { ok: false, error: String(err) };
   }
@@ -666,7 +671,7 @@ function showConsoleResult(title, result) {
 
 function rawSpec() {
   const f = $("raw-form").elements;
-  return { method: f.method.value, path: f.path.value.trim(), body: f.body.value };
+  return { method: f.method.value, path: f.path.value.trim(), body: f.body.value, headers: f.headers.value };
 }
 
 $("raw-form").addEventListener("submit", (e) => { e.preventDefault(); sendRaw(rawSpec(), "Console"); });

@@ -160,7 +160,7 @@ def _recording_client():
     api._auth = AuthSession(token="t", expires_at_ms=int(time.time() * 1000) + 3_600_000, user_id="1", account_type=1)
     calls = []
 
-    async def fake_request(method, path, *, payload, token):
+    async def fake_request(method, path, *, payload, token, extra_headers=None):
         calls.append((method, path, payload, token))
         return {}
 
@@ -201,3 +201,34 @@ def test_authed_request_requires_absolute_path():
     api, _ = _recording_client()
     with pytest.raises(ValueError):
         asyncio.run(api.authed_request("GET", "catbox-server/x"))
+
+
+def test_authed_requests_send_language_header_but_login_does_not():
+    import asyncio
+
+    from custom_components.meowant.api import MeowantApiClient
+
+    seen = []
+
+    class FakeResp:
+        status = 200
+
+        async def json(self, content_type=None):
+            return {"code": 0, "data": []}
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+    class FakeSession:
+        def request(self, method, url, *, headers, **kwargs):
+            seen.append(headers)
+            return FakeResp()
+
+    api = MeowantApiClient(FakeSession(), "a@b.com", "pw", device_id="d", tenant=Tenant("http://x", "i", "k", "p"))
+    asyncio.run(api._request("PUT", "/login", payload={}, token=None))
+    asyncio.run(api._request("GET", "/cats", payload=None, token="t"))
+    assert "x-ubt-language" not in seen[0]
+    assert seen[1]["x-ubt-language"] == "en"

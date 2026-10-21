@@ -10,8 +10,8 @@ from .api import MeowantApiClient
 from .const import CONF_AREA_CODE, CONF_DEVICE_ID
 from .coordinator import MeowantCoordinator
 
-# TODO: add Platform.SENSOR (etc.) once the device data model is known.
-PLATFORMS: list[Platform] = []
+# Read-only platforms. Nothing here writes to the box.
+PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.EVENT, Platform.SENSOR]
 
 type MeowantConfigEntry = ConfigEntry[MeowantCoordinator]
 

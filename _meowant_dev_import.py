@@ -8,9 +8,9 @@ Why this exists: custom_components/meowant/__init__.py imports real
 (Python always imports parent packages before submodules) and fail here, since
 this repo intentionally does NOT install the (large) homeassistant package.
 
-api.py and const.py themselves have no homeassistant dependency at all -- only
+api.py, const.py and models.py have no homeassistant dependency at all -- only
 aiohttp and each other -- so this loader registers stub parent-package entries
-directly in sys.modules and loads those two files by path, skipping the real
+directly in sys.modules and loads those files by path, skipping the real
 __init__.py entirely.
 """
 from __future__ import annotations
@@ -48,4 +48,5 @@ def load_meowant_api() -> types.ModuleType:
             sys.modules[name] = stub
 
     _load_by_path("custom_components.meowant.const", "const.py")
+    _load_by_path("custom_components.meowant.models", "models.py")
     return _load_by_path("custom_components.meowant.api", "api.py")

@@ -276,6 +276,7 @@ class RawRequest(BaseModel):
     method: str = "GET"
     path: str
     body: dict[str, Any] | None = None
+    headers: dict[str, str] | None = None
 
 
 @app.post("/api/raw")
@@ -283,7 +284,7 @@ async def raw_request(req: RawRequest) -> dict[str, Any]:
     """Signed, authenticated request to any path on the tenant, for exploring endpoints."""
     api = _require_api()
     log.info("Raw %s %s", req.method.upper(), req.path)
-    return await _section(api.authed_request(req.method, req.path, req.body))
+    return await _section(api.authed_request(req.method, req.path, req.body, req.headers))
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

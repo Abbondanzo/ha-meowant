@@ -1,0 +1,61 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "waste_bin_needs_emptying": {
+        "default": "mdi:delete-empty",
+        "state": {
+          "on": "mdi:delete-alert"
+        }
+      },
+      "deodorant_expired": {
+        "default": "mdi:air-filter",
+        "state": {
+          "on": "mdi:air-filter-outline"
+        }
+      }
+    },
+    "event": {
+      "activity": {
+        "default": "mdi:cat"
+      }
+    },
+    "sensor": {
+      "waste_bin_level": {
+        "default": "mdi:delete-variant"
+      },
+      "waste_bin_uses": {
+        "default": "mdi:counter"
+      },
+      "deodorant_days_left": {
+        "default": "mdi:air-filter"
+      },
+      "last_cat_visit": {
+        "default": "mdi:cat"
+      },
+      "last_visit_weight": {
+        "default": "mdi:scale"
+      },
+      "last_visit_duration": {
+        "default": "mdi:timer-outline"
+      },
+      "last_clean": {
+        "default": "mdi:broom"
+      },
+      "last_device_event": {
+        "default": "mdi:history"
+      },
+      "auto_clean_delay": {
+        "default": "mdi:timer-cog-outline"
+      },
+      "cat_weight": {
+        "default": "mdi:scale"
+      },
+      "cat_visits_today": {
+        "default": "mdi:paw"
+      },
+      "cat_time_in_box_today": {
+        "default": "mdi:timer-outline"
+      }
+    }
+  }
+}

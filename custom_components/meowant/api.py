@@ -21,6 +21,7 @@ import aiohttp
 from .const import (
     ACCOUNT_TYPE_EMAIL,
     ACCOUNT_TYPE_PHONE,
+    API_LANGUAGE,
     DEFAULT_AREA_CODE,
     DEFAULT_APP_ID,
     DEFAULT_APP_KEY,
@@ -286,23 +287,39 @@ class MeowantApiClient:
         }
         return await self._authed("PUT", "/catbox-server/box/config/timePeriod/update", payload)
 
-    async def authed_request(self, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
+    async def authed_request(
+        self,
+        method: str,
+        path: str,
+        payload: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> Any:
         """Signed, authenticated request to any path on the tenant. For dev tooling."""
         if not path.startswith("/"):
             raise ValueError("path must start with /")
-        return await self._authed(method.upper(), path, payload)
+        return await self._authed(method.upper(), path, payload, headers)
 
-    async def _authed(self, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
+    async def _authed(
+        self,
+        method: str,
+        path: str,
+        payload: dict[str, Any] | None = None,
+        extra_headers: dict[str, str] | None = None,
+    ) -> Any:
         if not self._token_usable():
             await self.login()
         assert self._auth is not None
         try:
-            return await self._request(method, path, payload=payload, token=self._auth.token)
+            return await self._request(
+                method, path, payload=payload, token=self._auth.token, extra_headers=extra_headers
+            )
         except MeowantAuthError as err:
             if err.status != 401:
                 raise
             await self.login()
-            return await self._request(method, path, payload=payload, token=self._auth.token)
+            return await self._request(
+                method, path, payload=payload, token=self._auth.token, extra_headers=extra_headers
+            )
 
     def _token_usable(self) -> bool:
         if self._auth is None:
@@ -313,7 +330,13 @@ class MeowantApiClient:
         return self._auth.expires_at_ms - time.time() * 1000 > margin_ms
 
     async def _request(
-        self, method: str, path: str, *, payload: dict[str, Any] | None, token: str | None
+        self,
+        method: str,
+        path: str,
+        *,
+        payload: dict[str, Any] | None,
+        token: str | None,
+        extra_headers: dict[str, str] | None = None,
     ) -> Any:
         # Mirrors the Android app's login request (see API.md).
         headers = {
@@ -326,6 +349,10 @@ class MeowantApiClient:
         if token is not None:
             headers["authorization"] = token
             headers["product"] = self._tenant.product
+            headers["x-ubt-language"] = API_LANGUAGE
+        # Extra headers (dev tooling) can add to, but never replace, auth/signing headers.
+        for name, value in (extra_headers or {}).items():
+            headers.setdefault(name.lower(), value)
 
         url = self._tenant.base_url.rstrip("/") + path
         try:

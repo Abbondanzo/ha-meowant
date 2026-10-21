@@ -2,6 +2,18 @@
 
 Format based on [Keep a Changelog](https://keepachangelog.com/). Version numbers track `custom_components/meowant/manifest.json`.
 
+## [0.1.0] - 2026-10-21
+
+First version with entities. Everything is read-only; nothing writes to the box.
+
+### Added
+- Litter box sensors: waste bin level and uses, deodorant remaining, last cat visit (with cat, weight and duration), last visit weight and duration, last clean, last device event and auto-clean delay (diagnostic).
+- Binary sensors: online, waste bin needs emptying, deodorant expired.
+- Activity event entity that fires for each new cat visit, scheduled clean or clean after a visit, for automations.
+- One device per cat with weight, visits today and time in box today. Cats added in the app later are picked up automatically.
+- Diagnostics download with personal data redacted.
+- Logged-in requests send `X-UBT-Language: en`, so cat breeds come back in English.
+
 ## [0.0.3] - 2026-10-21
 
 ### Added
