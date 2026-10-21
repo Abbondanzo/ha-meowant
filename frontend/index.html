@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meowant Dev Console</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #fff; --text: #1d2330; --muted: #687187; --border: #dde1e8;
+    --accent: #3b6fd8; --accent-soft: #e6edfb; --accent-text: #fff;
+    --ok: #1f8a4c; --err: #c23a3a; --warn: #a86a00;
+    --code: #f0f2f6; --j-key: #7a3fb8; --j-str: #1f7a4a; --j-num: #b4530e; --j-lit: #2160c4;
+    --bar: #e3e7ee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #13161c; --card: #1c2028; --text: #e4e7ee; --muted: #8d96a8; --border: #2f3542;
+      --accent: #6d97f0; --accent-soft: #24304a; --accent-text: #0e1320;
+      --ok: #4cc27f; --err: #ec6a6a; --warn: #e0a640;
+      --code: #161a21; --j-key: #c49af0; --j-str: #7fd3a0; --j-num: #f0a868; --j-lit: #7fb0f5;
+      --bar: #2b313d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, -apple-system, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 64px; }
+  h1 { font-size: 18px; margin: 0; }
+  h2 { font-size: 15px; margin: 0 0 12px; }
+  h3 { font-size: 12px; margin: 0 0 8px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  p { margin: 0 0 8px; }
+  code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+  .ok { color: var(--ok); } .err { color: var(--err); } .warn { color: var(--warn); }
+
+  /* layout */
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .stack > * + * { margin-top: 16px; }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  .grid-wide { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+  .row { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+  .row > label { flex: 1 1 110px; }
+
+  /* tabs */
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 16px; overflow-x: auto; }
+  .tabs button { background: none; color: var(--muted); border: 0; border-bottom: 2px solid transparent; border-radius: 0;
+    padding: 9px 14px; font-weight: 600; }
+  .tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+  .tabs button:hover { color: var(--text); }
+
+  /* forms */
+  label { display: block; font-size: 12px; color: var(--muted); }
+  label > input, label > select, label > textarea { margin-top: 3px; }
+  input, select, textarea { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg); color: var(--text); font: inherit; }
+  input[type=checkbox] { width: auto; margin: 0 4px 0 0; vertical-align: middle; }
+  label.check { display: flex; align-items: center; color: var(--text); font-size: 13px; padding-bottom: 6px; flex: 0 0 auto; }
+  textarea { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; min-height: 90px; resize: vertical; }
+  button { background: var(--accent); color: var(--accent-text); border: 0; border-radius: 6px; padding: 7px 14px;
+    font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  button.secondary { background: var(--accent-soft); color: var(--text); }
+  button.ghost { background: none; color: var(--muted); padding: 4px 8px; font-weight: 500; }
+  button:disabled { opacity: .55; cursor: progress; }
+
+  /* tiles */
+  .tile { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .tile .label { font-size: 12px; color: var(--muted); }
+  .tile .value { font-size: 22px; font-weight: 650; margin: 2px 0; }
+  .tile .sub { font-size: 12px; color: var(--muted); }
+  .bar { height: 6px; background: var(--bar); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+  .bar > span { display: block; height: 100%; background: var(--accent); }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+
+  /* tables */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; overflow-wrap: anywhere; }
+  tr:last-child td { border-bottom: 0; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.kv td:first-child { color: var(--muted); width: 45%; }
+  .badge { display: inline-block; padding: 0 8px; border-radius: 999px; font-size: 12px; background: var(--accent-soft); }
+  .badge.on { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+  .badge.off { background: var(--bar); color: var(--muted); }
+
+  /* json */
+  .json-wrap { position: relative; }
+  pre.json { background: var(--code); border: 1px solid var(--border); padding: 10px 12px; border-radius: 6px; overflow: auto;
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; margin: 0; max-height: 420px; }
+  .json-wrap .copy { position: absolute; top: 6px; right: 6px; font-size: 11px; padding: 2px 8px; }
+  .j-key { color: var(--j-key); } .j-str { color: var(--j-str); } .j-num { color: var(--j-num); } .j-lit { color: var(--j-lit); }
+  details > summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 8px; user-select: none; }
+  details[open] > summary { margin-bottom: 6px; }
+
+  /* cats */
+  .cat { display: flex; gap: 12px; align-items: flex-start; }
+  .cat img { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; background: var(--bar); flex: none; }
+  .cat .avatar { width: 64px; height: 64px; border-radius: 10px; background: var(--accent-soft); display: grid; place-items: center;
+    font-size: 24px; font-weight: 700; color: var(--accent); flex: none; }
+
+  /* log */
+  .log-entry { border-bottom: 1px solid var(--border); padding: 8px 0; }
+  .log-entry:last-child { border-bottom: 0; }
+  .log-entry summary { color: var(--text); font-size: 13px; margin: 0; }
+
+  .custom-btn { display: inline-flex; margin: 0 6px 6px 0; }
+  .custom-btn button:first-child { border-radius: 6px 0 0 6px; }
+  .custom-btn button.remove { border-radius: 0 6px 6px 0; padding: 7px 9px; margin-left: 1px; }
+  [hidden] { display: none !important; }
+  @media (max-width: 520px) { .tile .value { font-size: 19px; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div class="toolbar">
+      <h1>Meowant dev console</h1>
+      <span id="session-status" class="muted small">Not logged in</span>
+    </div>
+    <div class="toolbar" id="device-bar" hidden>
+      <select id="device-select" style="width:auto" aria-label="Box"></select>
+      <button id="refresh-btn" class="secondary" type="button">Refresh</button>
+      <select id="auto-refresh" style="width:auto" aria-label="Auto-refresh">
+        <option value="0">Auto-refresh off</option>
+        <option value="30">Every 30 s</option>
+        <option value="60">Every 60 s</option>
+        <option value="300">Every 5 min</option>
+      </select>
+      <span id="refreshed-at" class="muted small"></span>
+      <button id="show-login" class="ghost" type="button">Switch account</button>
+    </div>
+  </div>
+
+  <!-- Login -->
+  <section class="card" id="login-card" style="margin-bottom:16px">
+    <h2>Log in</h2>
+    <p class="muted small">Blank fields use <code>.env</code>. Each login is a single attempt; repeated failures lock the account for a while.</p>
+    <form id="login-form" class="row">
+      <label>Email <input id="email" name="email" type="email" autocomplete="off"></label>
+      <label>Password <input id="password" name="password" type="password" autocomplete="new-password"></label>
+      <label style="flex:0 0 100px">Country <input id="area_code" name="area_code" placeholder="US"></label>
+      <button id="login-btn" type="submit">Log in</button>
+    </form>
+    <div id="login-result" style="margin-top:10px"></div>
+  </section>
+
+  <div id="app" hidden>
+    <nav class="tabs" role="tablist" id="tabs"></nav>
+
+    <!-- Overview -->
+    <section data-tab="overview" class="stack">
+      <div class="grid" id="tiles"></div>
+      <p class="muted small" id="overview-note"></p>
+    </section>
+
+    <!-- Activity -->
+    <section data-tab="activity" class="stack">
+      <div class="card"><h2>Cat visits</h2><div id="visits"></div></div>
+      <div class="card"><h2>Device events</h2><div id="events"></div></div>
+    </section>
+
+    <!-- Cats -->
+    <section data-tab="cats"><div class="grid-wide" id="cats"></div></section>
+
+    <!-- Settings -->
+    <section data-tab="settings" class="stack">
+      <div class="grid-wide" id="settings"></div>
+      <div class="card"><h2>Raw responses</h2><div id="raw-state"></div></div>
+    </section>
+
+    <!-- Actions -->
+    <section data-tab="actions" class="grid-wide">
+      <div class="card">
+        <h2>Waste bin</h2>
+        <p class="muted small">Resets the "uses since emptied" counter.</p>
+        <button type="button" data-action="reset_waste_bin" data-confirm="Reset the waste bin counter?">Mark emptied</button>
+      </div>
+      <div class="card">
+        <h2>Deodorant</h2>
+        <div class="toolbar">
+          <button type="button" data-action="deodorant_replaced" data-confirm="Mark the deodorant block as replaced?">Mark replaced</button>
+          <button type="button" class="secondary" data-action="deodorant_alert" data-body='{"enabled":true}'>Alert on</button>
+          <button type="button" class="secondary" data-action="deodorant_alert" data-body='{"enabled":false}'>Alert off</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Auto clean</h2>
+        <p class="muted small">Delay is pre-filled from the box's current <code>lazyTime</code>. Whether auto clean is currently enabled isn't known; check the box below deliberately.</p>
+        <form class="row" data-form="auto_clean">
+          <label class="check"><input type="checkbox" name="enabled" checked>Enabled</label>
+          <label>Delay after visit (min) <input type="number" name="minutes" min="1" required></label>
+          <button type="submit">Apply</button>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Time window</h2>
+        <p class="muted small">Pre-filled from the first do-not-disturb window. Its <code>functionType</code> isn't known yet.</p>
+        <form class="row" data-form="time_period">
+          <label>configId <input type="number" name="config_id" required></label>
+          <label>functionType <input type="number" name="function_type" required></label>
+          <label>Start <input type="time" name="start" value="22:00"></label>
+          <label>End <input type="time" name="end" value="07:00"></label>
+          <label class="check"><input type="checkbox" name="enabled" checked>On</label>
+          <button type="submit">Send</button>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Feature switch</h2>
+        <p class="muted small">Generic <code>switch/update</code>. functionType 2 = auto clean.</p>
+        <form class="row" data-form="switch">
+          <label>functionType <input type="number" name="function_type" value="2" required></label>
+          <label>optionInt <input type="number" name="option_int" required></label>
+          <label class="check"><input type="checkbox" name="enabled" checked>On</label>
+          <button type="submit">Send</button>
+        </form>
+      </div>
+      <div class="card" id="action-result-card" hidden>
+        <h2>Last result</h2>
+        <div id="action-result"></div>
+      </div>
+    </section>
+
+    <!-- Console -->
+    <section data-tab="console" class="stack">
+      <div class="card">
+        <form id="raw-form">
+          <div class="row">
+            <label style="flex:0 0 100px">Method
+              <select name="method"><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option></select>
+            </label>
+            <label style="flex:1 1 300px">Path <input name="path" placeholder="/catbox-server/box/config/allConfig?serialNumber={serial}" required></label>
+          </div>
+          <label style="margin-top:8px">JSON body (optional) <textarea name="body" placeholder='{"serialNumber": "{serial}"}'></textarea></label>
+          <div class="toolbar" style="margin-top:10px">
+            <button type="submit">Send</button>
+            <button type="button" class="secondary" id="format-body">Format body</button>
+            <button type="button" class="secondary" id="save-custom">Save as button…</button>
+            <span class="muted small"><code>{serial}</code> is replaced with the selected box.</span>
+          </div>
+        </form>
+      </div>
+      <div class="card" id="console-result-card" hidden>
+        <h2 id="console-result-title">Response</h2>
+        <div id="console-result"></div>
+      </div>
+      <div class="card">
+        <h2>Custom buttons</h2>
+        <div id="custom-buttons"></div>
+      </div>
+    </section>
+
+    <!-- Log -->
+    <section data-tab="log" class="card">
+      <div class="toolbar" style="justify-content:space-between;margin-bottom:6px">
+        <h2 style="margin:0">Activity log</h2>
+        <button type="button" class="ghost" id="clear-log">Clear</button>
+      </div>
+      <div id="log"><p class="muted small">Actions and console requests show up here.</p></div>
+    </section>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const STORE_KEY = "meowant-dev-console";
+const TABS = [["overview", "Overview"], ["activity", "Activity"], ["cats", "Cats"], ["settings", "Settings"],
+  ["actions", "Actions"], ["console", "Console"], ["log", "Log"]];
+const EVENT_TYPES = { 21: "Cat visit", 33: "Scheduled clean", 47: "Clean after visit (likely)" };
+
+let serial = null;
+let devices = [];
+let cats = [];
+let autoTimer = null;
+
+// --- per-viewer prefs, browser-only ---
+function loadPrefs() { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; } }
+function savePrefs(patch) { try { localStorage.setItem(STORE_KEY, JSON.stringify({ ...loadPrefs(), ...patch })); } catch {} }
+
+// --- DOM helpers ---
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === "class") node.className = v;
+    else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+    else node.setAttribute(k, v === true ? "" : v);
+  }
+  node.append(...children.flat().filter((c) => c != null && c !== false));
+  return node;
+}
+const fmt = (v) => (v === null || v === undefined || v === "" ? "—" : typeof v === "object" ? JSON.stringify(v) : String(v));
+const pad = (n) => String(n).padStart(2, "0");
+const hhmm = (h, m) => (h == null ? "—" : `${pad(h)}:${pad(m ?? 0)}`);
+const badge = (on, yes = "On", no = "Off") => el("span", { class: `badge ${on ? "on" : "off"}` }, on ? yes : no);
+
+function when(ms) {
+  if (!ms) return "—";
+  const d = new Date(ms);
+  const mins = Math.round((Date.now() - ms) / 60000);
+  const ago = mins < 1 ? "just now" : mins < 60 ? `${mins} min ago` : mins < 1440 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} d ago`;
+  return `${d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · ${ago}`;
+}
+
+// --- JSON viewer: highlighted, with a copy button ---
+function jsonView(obj) {
+  const text = JSON.stringify(obj, null, 2) ?? "null";
+  const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const html = escaped.replace(
+    /("(?:\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*")(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g,
+    (m, str, colon, lit) => {
+      if (str) return colon ? `<span class="j-key">${str}</span>${colon}` : `<span class="j-str">${str}</span>`;
+      if (lit) return `<span class="j-lit">${m}</span>`;
+      return `<span class="j-num">${m}</span>`;
+    }
+  );
+  const pre = el("pre", { class: "json" });
+  pre.innerHTML = html; // safe: built from escaped text
+  const copy = el("button", { type: "button", class: "secondary copy", onclick: async () => {
+    try { await navigator.clipboard.writeText(text); copy.textContent = "Copied"; } catch { copy.textContent = "Copy failed"; }
+    setTimeout(() => (copy.textContent = "Copy"), 1200);
+  } }, "Copy");
+  return el("div", { class: "json-wrap" }, pre, copy);
+}
+const rawDetails = (label, obj) => el("details", {}, el("summary", {}, label), jsonView(obj));
+
+function table(headers, rowsData) {
+  if (!rowsData.length) return el("p", { class: "muted small" }, "Nothing here.");
+  return el("table", {},
+    el("thead", {}, el("tr", {}, headers.map(([h, cls]) => el("th", { class: cls }, h)))),
+    el("tbody", {}, rowsData.map((r) => el("tr", {}, r.map((cell, i) => el("td", { class: headers[i][1] }, cell)))))
+  );
+}
+const kv = (pairs) => el("table", { class: "kv" }, pairs.map(([k, v]) => el("tr", {}, el("td", {}, k), el("td", {}, v))));
+const errorBox = (section) => el("p", { class: "err small" }, section.error || "Failed to load");
+
+// --- api ---
+async function api(path, opts = {}) {
+  const resp = await fetch(path, {
+    method: opts.method || "GET",
+    headers: opts.body ? { "content-type": "application/json" } : {},
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
+  return data;
+}
+
+// --- tabs ---
+function buildTabs() {
+  $("tabs").replaceChildren(...TABS.map(([id, label]) =>
+    el("button", { type: "button", role: "tab", "data-id": id, onclick: () => showTab(id) }, label)));
+}
+function showTab(id) {
+  if (!TABS.some(([t]) => t === id)) id = "overview";
+  document.querySelectorAll("[data-tab]").forEach((s) => (s.hidden = s.dataset.tab !== id));
+  document.querySelectorAll("#tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.id === id)));
+  savePrefs({ tab: id });
+  if (location.hash !== `#${id}`) history.replaceState(null, "", `#${id}`);
+}
+
+// --- log ---
+function log(label, obj, ok = true) {
+  const box = $("log");
+  if (box.querySelector("p.muted")) box.replaceChildren();
+  box.prepend(el("details", { class: "log-entry" },
+    el("summary", {}, el("span", { class: ok ? "ok" : "err" }, ok ? "● " : "● "),
+      el("span", { class: "muted" }, new Date().toLocaleTimeString() + "  "), label),
+    jsonView(obj)));
+}
+
+// --- session / devices ---
+function showSession(info) {
+  const expires = info.expires_at_ms ? new Date(info.expires_at_ms).toLocaleString() : "?";
+  $("session-status").replaceChildren(el("span", { class: "dot", style: "background:var(--ok)" }), `User ${info.user_id} · token until ${expires}`);
+  $("login-card").hidden = true;
+  $("device-bar").hidden = false;
+  $("app").hidden = false;
+}
+
+function showDevices(result) {
+  if (result.devices_error) { log("Device list", result, false); return; }
+  devices = result.devices || [];
+  $("device-select").replaceChildren(...devices.map((d) =>
+    el("option", { value: d.serialNumber }, `${d.deviceName || "Box"} · ${d.serialNumber}${d.shareFlag ? " (shared)" : ""}`)));
+  if (devices.length) selectDevice(devices[0].serialNumber);
+}
+
+function selectDevice(sn) { serial = sn; refreshState(); }
+
+$("login-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("login-btn").disabled = true;
+  $("login-result").replaceChildren(el("p", { class: "muted small" }, "Logging in…"));
+  try {
+    const data = await api("/api/login", { method: "POST", body: Object.fromEntries(new FormData(e.target)) });
+    if (data.ok) {
+      $("login-result").replaceChildren();
+      showSession(data);
+      showDevices(data);
+      log("Logged in", { user_id: data.user_id, devices: (data.devices || []).length });
+    } else {
+      const msg = data.code === 2342 ? "Account temporarily locked after too many failed logins. Wait before retrying."
+        : data.auth_rejected ? "Credentials rejected." : `Failed at ${data.stage}.`;
+      $("login-result").replaceChildren(el("p", { class: "err" }, msg), jsonView(data));
+    }
+  } catch (err) {
+    $("login-result").replaceChildren(el("p", { class: "err" }, String(err)));
+  } finally {
+    $("login-btn").disabled = false;
+  }
+});
+$("show-login").addEventListener("click", () => { $("login-card").hidden = !$("login-card").hidden; });
+
+// --- rendering: overview ---
+function tile(label, value, sub, extra) {
+  return el("div", { class: "tile" }, el("div", { class: "label" }, label), el("div", { class: "value" }, value),
+    sub ? el("div", { class: "sub" }, sub) : null, extra);
+}
+
+function renderOverview(state) {
+  const tiles = [];
+  const online = state.online, bin = state.waste_bin, deo = state.deodorant, cfg = state.config;
+  if (online.ok) {
+    tiles.push(tile("Connection",
+      el("span", {}, el("span", { class: "dot", style: `background:var(--${online.data.online ? "ok" : "err"})` }), online.data.online ? "Online" : "Offline"),
+      online.data.onlineTime ? `since ${online.data.onlineTime}` : null));
+  }
+  if (bin.ok) {
+    const b = bin.data, pct = Math.max(0, Math.min(100, Number(b.percentage) || 0));
+    tiles.push(tile("Waste bin", `${pct}%`, `${fmt(b.boxUseTimes)} of ${fmt(b.boxFullMax)} uses · alert at ${fmt(b.boxFullAlert)}`,
+      el("div", { class: "bar" }, el("span", { style: `width:${pct}%` }))));
+  }
+  if (deo.ok) {
+    const d = deo.data;
+    tiles.push(tile("Deodorant", d.expired ? el("span", { class: "warn" }, "Expired") : `${fmt(d.remainingDays)} days`,
+      `alert ${d.alertSwitch ? "on" : "off"}`));
+  }
+  const visit = firstRecord(state.cat_visits);
+  if (visit) tiles.push(tile("Last cat visit", catName(visit.catInfoId), `${when(visit.eventTime)} · ${fmt(visit.weight)} kg · ${fmt(visit.costTime)} s`));
+  const ev = firstRecord(state.device_events);
+  if (ev) tiles.push(tile("Last device event", EVENT_TYPES[ev.eventType] || `Event ${ev.eventType}`, when(ev.eventTime)));
+  if (cfg.ok) {
+    const c = cfg.data;
+    if (typeof c.lazyTime === "number") tiles.push(tile("Auto-clean delay", c.lazyTime >= 60 ? `${Math.round(c.lazyTime / 60)} min` : `${c.lazyTime} s`, "after a visit (lazyTime)"));
+    const dnd = (c.disturbTimeConfigList || [])[0];
+    if (dnd) tiles.push(tile("Do not disturb", `${hhmm(dnd.startTimeHour, dnd.startTimeMinute)}–${hhmm(dnd.endTimeHour, dnd.endTimeMinute)}`, dnd.openSwitch ? "enabled" : "disabled"));
+    const fw = (c.boxFunctionVOList || [])[0]?.firmwareVersion;
+    if (fw) tiles.push(tile("Firmware", fw.replace(/^main_/, ""), `${(c.taskConfigList || []).length} scheduled cleans`));
+  }
+  $("tiles").replaceChildren(...tiles);
+  const failed = Object.entries(state).filter(([, s]) => !s.ok).map(([k]) => k);
+  $("overview-note").textContent = failed.length ? `Couldn't load: ${failed.join(", ")}.` : "";
+}
+
+function firstRecord(section) { return section?.ok ? (section.data?.records || [])[0] : null; }
+function catName(id) {
+  if (!id) return "Unidentified cat";
+  return cats.find((c) => c.catInfoId === id)?.nickname || `Cat ${id}`;
+}
+
+// --- rendering: activity ---
+function renderActivity(state) {
+  const visits = state.cat_visits, events = state.device_events;
+  $("visits").replaceChildren(...(visits.ok ? [
+    table([["When"], ["Cat"], ["Weight", "num"], ["Time in box", "num"]],
+      (visits.data.records || []).map((r) => [when(r.eventTime), catName(r.catInfoId), `${fmt(r.weight)} kg`, `${fmt(r.costTime)} s`])),
+    el("p", { class: "muted small", style: "margin-top:8px" }, `Showing ${(visits.data.records || []).length} of ${fmt(visits.data.total)}.`),
+    rawDetails("Raw JSON", visits.data),
+  ] : [errorBox(visits)]));
+  $("events").replaceChildren(...(events.ok ? [
+    table([["When"], ["Event"], ["Code", "num"]],
+      (events.data.records || []).map((r) => [when(r.eventTime), EVENT_TYPES[r.eventType] || el("span", { class: "muted" }, "Unknown"), String(r.eventType)])),
+    el("p", { class: "muted small", style: "margin-top:8px" }, `Showing ${(events.data.records || []).length} of ${fmt(events.data.total)}.`),
+    rawDetails("Raw JSON", events.data),
+  ] : [errorBox(events)]));
+}
+
+// --- rendering: cats ---
+function renderCats(section) {
+  if (!section.ok) { $("cats").replaceChildren(el("div", { class: "card" }, errorBox(section))); return; }
+  cats = Array.isArray(section.data) ? section.data : [];
+  if (!cats.length) { $("cats").replaceChildren(el("div", { class: "card muted" }, "No cat profiles.")); return; }
+  $("cats").replaceChildren(...cats.map((c) => {
+    const avatar = el("div", { class: "avatar" }, (c.nickname || "?").slice(0, 1).toUpperCase());
+    let pic = avatar;
+    if (c.icon) {
+      pic = el("img", { src: c.icon, alt: "", loading: "lazy" });
+      pic.addEventListener("error", () => pic.replaceWith(avatar));
+    }
+    return el("div", { class: "card" },
+      el("div", { class: "cat" }, pic, el("div", {},
+        el("h2", { style: "margin:0" }, c.nickname || "Unnamed"),
+        el("div", { class: "muted small" }, `${c.catBreed?.breed || "Breed " + fmt(c.breed)} · born ${fmt(c.birthday)}`))),
+      el("div", { style: "margin-top:10px" }, kv([
+        ["Weight", `${fmt(c.weight)} kg (base ${fmt(c.baseWeight)} kg)`],
+        ["Visits today", fmt(c.number)],
+        ["Time in box today", `${fmt(c.costTime)} s`],
+        ["Status", fmt(c.catStatus)],
+        ["Health alerts", badge(c.healthAlertConfig?.healthAlertSwitch)],
+        ["Cat ID", fmt(c.catInfoId)],
+      ])),
+      rawDetails("Raw JSON", c));
+  }));
+}
+
+// --- rendering: settings ---
+function renderSettings(state) {
+  const cfg = state.config;
+  if (!cfg.ok) { $("settings").replaceChildren(el("div", { class: "card" }, errorBox(cfg))); }
+  else {
+    const c = cfg.data;
+    const switches = Object.entries(c).filter(([k]) => /Switch$/.test(k))
+      .map(([k, v]) => [k.replace(/Switch$/, ""), v == null ? el("span", { class: "muted" }, "—") : badge(v)]);
+    $("settings").replaceChildren(
+      el("div", { class: "card" }, el("h2", {}, "Scheduled cleans"),
+        table([["Time"], ["Enabled"], ["Config ID", "num"]],
+          [...(c.taskConfigList || [])].sort((a, b) => a.timeHour * 60 + a.timeMinute - (b.timeHour * 60 + b.timeMinute))
+            .map((t) => [hhmm(t.timeHour, t.timeMinute), badge(t.openSwitch), String(t.timeTaskConfigId)]))),
+      el("div", { class: "card" }, el("h2", {}, "Do not disturb"),
+        table([["Window"], ["Enabled"], ["Config ID", "num"]],
+          (c.disturbTimeConfigList || []).map((d) => [
+            `${hhmm(d.startTimeHour, d.startTimeMinute)}–${hhmm(d.endTimeHour, d.endTimeMinute)}`, badge(d.openSwitch), String(d.disturbTimeConfigId)])),
+        el("h3", { style: "margin-top:14px" }, "Light schedule"),
+        table([["Window"], ["Enabled"]], (c.lightTimeConfigList || []).map((d) => [fmt(d), badge(d.openSwitch)]))),
+      el("div", { class: "card" }, el("h2", {}, "General"), kv([
+        ["Auto-clean delay (lazyTime)", `${fmt(c.lazyTime)} s`],
+        ["Time zone", `${fmt(c.gmtTimeZone)}${c.dst ? " (DST)" : ""}`],
+        ["Weight unit", fmt(c.weighUnit)],
+        ["Litter type", fmt(c.litterType)],
+        ["Box uses (config)", fmt(c.boxUseTimes)],
+        ["Wi-Fi", fmt(c.wifiName)],
+        ["Config ID", fmt(c.configId)],
+      ])),
+      el("div", { class: "card" }, el("h2", {}, "Switches"), kv(switches)),
+      el("div", { class: "card" }, el("h2", {}, "Notifications"),
+        table([["Type", "num"], ["Enabled"], ["Time"]],
+          (c.notifyConfigList || []).map((n) => [String(n.type), badge(n.openSwitch), hhmm(n.timeHour, n.timeMinute)]))),
+      el("div", { class: "card" }, el("h2", {}, "Firmware & functions"),
+        table([["Type", "num"], ["Enabled"], ["Firmware"]],
+          (c.boxFunctionVOList || []).map((f) => [String(f.type), badge(f.openSwitch), fmt(f.firmwareVersion)]))),
+    );
+  }
+  const labels = { config: "allConfig", waste_bin: "box-use-times", deodorant: "deodorant-block/status",
+    online: "im/online/device", cat_visits: "record/new (cat visits)", device_events: "record/new (device events)" };
+  $("raw-state").replaceChildren(...Object.entries(labels).map(([k, label]) =>
+    rawDetails(label, state[k].ok ? state[k].data : { error: state[k].error, code: state[k].code })));
+}
+
+// --- state refresh ---
+async function refreshState() {
+  if (!serial) return;
+  $("refresh-btn").disabled = true;
+  try {
+    const [state, catSection] = await Promise.all([api(`/api/devices/${encodeURIComponent(serial)}/state`), api("/api/cats")]);
+    renderCats(catSection); // first, so other views can show cat names
+    renderOverview(state);
+    renderActivity(state);
+    renderSettings(state);
+    if (state.config.ok) prefillForms(state.config.data);
+    $("refreshed-at").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+  } catch (err) {
+    log("Refresh", { error: String(err) }, false);
+    $("refreshed-at").replaceChildren(el("span", { class: "err" }, "Refresh failed"));
+  } finally {
+    $("refresh-btn").disabled = false;
+  }
+}
+
+// Start forms from the box's current settings so "Apply" doesn't silently change them.
+function prefillForms(config) {
+  const set = (form, name, value) => {
+    const input = document.querySelector(`form[data-form="${form}"] [name="${name}"]`);
+    if (!input || value == null || input === document.activeElement) return;
+    if (input.type === "checkbox") input.checked = Boolean(value); else input.value = value;
+  };
+  if (typeof config.lazyTime === "number") {
+    set("auto_clean", "minutes", Math.max(1, Math.round(config.lazyTime / 60)));
+    set("switch", "option_int", config.lazyTime);
+  }
+  const dnd = (config.disturbTimeConfigList || [])[0];
+  if (dnd) {
+    set("time_period", "config_id", dnd.disturbTimeConfigId);
+    set("time_period", "enabled", dnd.openSwitch);
+    set("time_period", "start", hhmm(dnd.startTimeHour, dnd.startTimeMinute));
+    set("time_period", "end", hhmm(dnd.endTimeHour, dnd.endTimeMinute));
+  }
+}
+
+function setAutoRefresh(seconds) {
+  clearInterval(autoTimer);
+  autoTimer = seconds ? setInterval(refreshState, seconds * 1000) : null;
+  $("auto-refresh").value = String(seconds);
+  savePrefs({ autoRefresh: seconds });
+}
+
+$("refresh-btn").addEventListener("click", refreshState);
+$("device-select").addEventListener("change", (e) => selectDevice(e.target.value));
+$("auto-refresh").addEventListener("change", (e) => setAutoRefresh(Number(e.target.value)));
+
+// --- actions ---
+async function runAction(action, body, label) {
+  if (!serial) return;
+  let result;
+  try {
+    result = await api(`/api/devices/${encodeURIComponent(serial)}/actions/${action}`, { method: "POST", body });
+  } catch (err) {
+    result = { ok: false, error: String(err) };
+  }
+  log(label, result, result.ok);
+  $("action-result-card").hidden = false;
+  $("action-result").replaceChildren(
+    el("p", { class: result.ok ? "ok" : "err" }, `${label}: ${result.ok ? "done" : "failed"}`), jsonView(result));
+  if (result.ok) refreshState();
+}
+
+document.querySelectorAll("[data-action]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    if (btn.dataset.confirm && !confirm(btn.dataset.confirm)) return;
+    runAction(btn.dataset.action, btn.dataset.body ? JSON.parse(btn.dataset.body) : {}, btn.textContent);
+  });
+});
+
+document.querySelectorAll("form[data-form]").forEach((form) => {
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const f = form.elements;
+    const enabled = f.enabled ? f.enabled.checked : undefined;
+    if (form.dataset.form === "auto_clean") {
+      runAction("switch", { function_type: 2, enabled, option_int: Number(f.minutes.value) * 60 }, "Auto clean");
+    } else if (form.dataset.form === "switch") {
+      runAction("switch", { function_type: Number(f.function_type.value), enabled, option_int: Number(f.option_int.value) }, "Feature switch");
+    } else if (form.dataset.form === "time_period") {
+      runAction("time_period", {
+        config_id: Number(f.config_id.value), function_type: Number(f.function_type.value),
+        enabled, start: f.start.value, end: f.end.value,
+      }, "Time window");
+    }
+  });
+});
+
+// --- console + custom buttons ---
+const fill = (text) => (text || "").replaceAll("{serial}", serial || "");
+
+async function sendRaw(spec, label) {
+  let body = null;
+  if (spec.body && spec.body.trim()) {
+    try { body = JSON.parse(fill(spec.body)); }
+    catch { showConsoleResult(label, { ok: false, error: "Body isn't valid JSON" }); return; }
+  }
+  let result;
+  try {
+    result = await api("/api/raw", { method: "POST", body: { method: spec.method, path: fill(spec.path), body } });
+  } catch (err) {
+    result = { ok: false, error: String(err) };
+  }
+  showConsoleResult(`${label}: ${spec.method} ${fill(spec.path)}`, result);
+}
+
+function showConsoleResult(title, result) {
+  log(title, result, result.ok);
+  $("console-result-card").hidden = false;
+  $("console-result-title").replaceChildren(el("span", { class: result.ok ? "ok" : "err" }, result.ok ? "OK  " : "Error  "),
+    el("code", {}, title));
+  $("console-result").replaceChildren(jsonView(result.ok ? result.data : result));
+}
+
+function rawSpec() {
+  const f = $("raw-form").elements;
+  return { method: f.method.value, path: f.path.value.trim(), body: f.body.value };
+}
+
+$("raw-form").addEventListener("submit", (e) => { e.preventDefault(); sendRaw(rawSpec(), "Console"); });
+$("format-body").addEventListener("click", () => {
+  const box = $("raw-form").elements.body;
+  if (!box.value.trim()) return;
+  try { box.value = JSON.stringify(JSON.parse(box.value), null, 2); } catch { alert("Body isn't valid JSON."); }
+});
+
+function renderCustomButtons() {
+  const buttons = loadPrefs().customButtons || [];
+  if (!buttons.length) {
+    $("custom-buttons").replaceChildren(el("p", { class: "muted small" }, "None yet. Build a request above and save it."));
+    return;
+  }
+  $("custom-buttons").replaceChildren(...buttons.map((b, i) =>
+    el("span", { class: "custom-btn" },
+      el("button", { type: "button", title: `${b.method} ${b.path}`, onclick: () => {
+        if (b.method !== "GET" && !confirm(`Send ${b.method} ${fill(b.path)}?`)) return;
+        sendRaw(b, b.name);
+      } }, b.name),
+      el("button", { type: "button", class: "secondary remove", title: "Remove", "aria-label": `Remove ${b.name}`, onclick: () => {
+        const list = loadPrefs().customButtons || [];
+        list.splice(i, 1);
+        savePrefs({ customButtons: list });
+        renderCustomButtons();
+      } }, "×"))));
+}
+
+$("save-custom").addEventListener("click", () => {
+  const spec = rawSpec();
+  if (!spec.path) { alert("Enter a path first."); return; }
+  const name = prompt("Button label:", spec.path.split("?")[0].split("/").filter(Boolean).pop());
+  if (!name) return;
+  savePrefs({ customButtons: [...(loadPrefs().customButtons || []), { name, ...spec }] });
+  renderCustomButtons();
+});
+
+$("clear-log").addEventListener("click", () => {
+  $("log").replaceChildren(el("p", { class: "muted small" }, "Actions and console requests show up here."));
+});
+
+// --- boot ---
+(async () => {
+  buildTabs();
+  showTab(location.hash.slice(1) || loadPrefs().tab || "overview");
+  window.addEventListener("hashchange", () => showTab(location.hash.slice(1)));
+  renderCustomButtons();
+  try {
+    const d = await api("/api/defaults");
+    if (d.email) $("email").value = d.email;
+    if (d.area_code) $("area_code").value = d.area_code;
+    if (d.password_set) $("password").placeholder = "(from .env)";
+  } catch {}
+  try {
+    const s = await api("/api/session");
+    if (s.logged_in) {
+      showSession(s);
+      showDevices(await api("/api/devices"));
+      setAutoRefresh(loadPrefs().autoRefresh || 0);
+    }
+  } catch {}
+})();
+</script>
+</body>
+</html>

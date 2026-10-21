@@ -15,8 +15,8 @@ from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
-class MeowantCoordinator(DataUpdateCoordinator[dict[str, Any]]):
-    """Polls the account's litter boxes on a fixed interval and hands state to entities."""
+class MeowantCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
+    """Polls the account's litter boxes on a fixed interval; data is keyed by serial number."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, api: MeowantApiClient) -> None:
         super().__init__(
@@ -28,11 +28,12 @@ class MeowantCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         self._api = api
 
-    async def _async_update_data(self) -> dict[str, Any]:
+    async def _async_update_data(self) -> dict[str, dict[str, Any]]:
         try:
-            return await self._api.get_devices()
+            devices = await self._api.get_devices()
         except MeowantAuthError as err:
             # Credentials no longer valid -- triggers HA's reauth flow rather than failing silently.
             raise ConfigEntryAuthFailed(str(err)) from err
         except MeowantApiError as err:
             raise UpdateFailed(str(err)) from err
+        return {d["serialNumber"]: d for d in devices if d.get("serialNumber")}

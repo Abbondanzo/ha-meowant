@@ -3,10 +3,11 @@
     "step": {
       "user": {
         "title": "Connect to Meowant",
-        "description": "Enter the email and password you use in the Meowant app.",
+        "description": "Enter the email and password you use in the AIR PET app, and the country you chose when signing up (two-letter code, e.g. US).",
         "data": {
           "email": "Email",
-          "password": "Password"
+          "password": "Password",
+          "area_code": "Country code"
         }
       },
       "reauth_confirm": {
@@ -20,7 +21,9 @@
     "error": {
       "invalid_auth": "Invalid email or password.",
       "cannot_connect": "Could not connect to the Meowant service.",
-      "unknown": "Unexpected error."
+      "unknown": "Unexpected error.",
+      "too_many_attempts": "Too many failed logins. The account is temporarily locked; wait a while and try again.",
+      "invalid_area_code": "Enter the two-letter country code you chose in the app (e.g. US), not a phone prefix."
     },
     "abort": {
       "already_configured": "This Meowant account is already configured.",
