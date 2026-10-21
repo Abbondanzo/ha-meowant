@@ -1,0 +1,30 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Meowant",
+        "description": "Enter the email and password you use in the Meowant app.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate Meowant",
+        "description": "Your password no longer works. Enter the current one.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid email or password.",
+      "cannot_connect": "Could not connect to the Meowant service.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This Meowant account is already configured.",
+      "reauth_successful": "Re-authentication was successful."
+    }
+  }
+}

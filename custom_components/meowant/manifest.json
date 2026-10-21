@@ -1,0 +1,12 @@
+{
+  "domain": "meowant",
+  "name": "Meowant",
+  "codeowners": ["@Abbondanzo"],
+  "config_flow": true,
+  "documentation": "https://github.com/Abbondanzo/ha-meowant",
+  "issue_tracker": "https://github.com/Abbondanzo/ha-meowant/issues",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "requirements": [],
+  "version": "0.0.1"
+}
