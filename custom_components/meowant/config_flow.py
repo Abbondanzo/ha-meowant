@@ -8,7 +8,13 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
+from homeassistant.helpers.selector import (
+    CountrySelector,
+    CountrySelectorConfig,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
 from .api import (
     MeowantApiClient,
@@ -28,7 +34,11 @@ STEP_USER_SCHEMA = vol.Schema(
         vol.Required(CONF_PASSWORD): TextSelector(
             TextSelectorConfig(type=TextSelectorType.PASSWORD)
         ),
-        vol.Required(CONF_AREA_CODE, default=DEFAULT_AREA_CODE): str,
+        # The country chosen at signup in the app; the server looks accounts
+        # up per country. A picker keeps phone prefixes like "1" out.
+        vol.Required(CONF_AREA_CODE, default=DEFAULT_AREA_CODE): CountrySelector(
+            CountrySelectorConfig()
+        ),
     }
 )
 
@@ -59,9 +69,7 @@ class MeowantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 area_code = normalize_area_code(user_input[CONF_AREA_CODE])
             except ValueError:
                 errors[CONF_AREA_CODE] = "invalid_area_code"
-                return self.async_show_form(
-                    step_id="user", data_schema=STEP_USER_SCHEMA, errors=errors
-                )
+                return self._show_user_form(user_input, errors)
 
             # Stable per config entry, like the app's per-install ID.
             device_id = new_device_id()
@@ -93,7 +101,18 @@ class MeowantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     },
                 )
 
-        return self.async_show_form(step_id="user", data_schema=STEP_USER_SCHEMA, errors=errors)
+        return self._show_user_form(user_input, errors)
+
+    def _show_user_form(
+        self, user_input: dict[str, Any] | None, errors: dict[str, str]
+    ) -> config_entries.ConfigFlowResult:
+        # Keep what the user typed (except the password) when re-showing after an error.
+        suggested = {k: v for k, v in (user_input or {}).items() if k != CONF_PASSWORD}
+        return self.async_show_form(
+            step_id="user",
+            data_schema=self.add_suggested_values_to_schema(STEP_USER_SCHEMA, suggested),
+            errors=errors,
+        )
 
     async def async_step_reauth(
         self, entry_data: dict[str, Any]

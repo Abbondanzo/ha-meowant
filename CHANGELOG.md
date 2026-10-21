@@ -2,6 +2,15 @@
 
 Format based on [Keep a Changelog](https://keepachangelog.com/). Version numbers track `custom_components/meowant/manifest.json`.
 
+## [0.0.3] - 2026-10-21
+
+### Added
+- Integration icon and logo, served locally from `custom_components/meowant/brand/`.
+
+### Changed
+- The config flow's country field is now Home Assistant's country picker, pre-filled with United States. Phone prefixes like `1` can no longer be entered.
+- The setup form keeps the email and country you entered when it's shown again after an error.
+
 ## [0.0.2] - 2026-10-21
 
 ### Added

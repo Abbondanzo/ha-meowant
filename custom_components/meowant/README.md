@@ -24,11 +24,16 @@ Copy this entire `custom_components/meowant/` folder into your Home Assistant co
 
 ## Setting it up
 
-Settings → Devices & Services → **Add Integration** → search "Meowant". Enter the email and password you use in the Meowant app.
+Settings → Devices & Services → **Add Integration** → search "Meowant". You'll be asked for:
+
+- **Email** / **Password**: your AIR PET app login
+- **Country**: the country you chose when signing up in the app (defaults to United States). The server looks accounts up by country, so the wrong one shows up as an invalid login.
 
 ## What you get
 
 Nothing yet. Entities will be added once the API is mapped out.
+
+The integration ships its own icon and logo in `brand/`. Home Assistant 2026.3+ serves these locally on the Integrations and Devices pages. HACS's downloads panel doesn't read this inline icon yet and shows "icon not available" ([hacs/integration#5223](https://github.com/hacs/integration/issues/5223)).
 
 ## Troubleshooting
 
