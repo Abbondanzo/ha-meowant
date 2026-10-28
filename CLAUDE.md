@@ -10,8 +10,8 @@ The upstream API is undocumented; everything learned about it (endpoints, auth f
 
 ## Architecture notes
 
-- `custom_components/meowant/api.py` and `const.py` have **no `homeassistant` dependency**: only `aiohttp` and each other. Every other file in that package (`__init__.py`, `coordinator.py`, `config_flow.py`, entity platforms) depends on `homeassistant`. This split is deliberate: it lets `backend/`, `tests/` and ad-hoc dev scripts reuse the API client without installing the (large) `homeassistant` package.
-- `_meowant_dev_import.py` (repo root) is how that reuse works: it registers stub parent-package entries in `sys.modules` and loads `api.py`/`const.py` by file path, bypassing the real `__init__.py`. If you rename or restructure `custom_components/meowant/`, this loader needs to follow.
+- `custom_components/meowant/api.py`, `const.py`, `models.py` and the IM/MQTT layer (`im.py`, `im_proto.py`, `mqtt.py`) have **no `homeassistant` dependency**: only `aiohttp`, the standard library and each other. Every other file in that package (`__init__.py`, `coordinator.py`, `live.py`, `config_flow.py`, entity platforms) depends on `homeassistant`. This split is deliberate: it lets `backend/`, `tests/` and ad-hoc dev scripts reuse the API client without installing the (large) `homeassistant` package.
+- `_meowant_dev_import.py` (repo root) is how that reuse works: it registers stub parent-package entries in `sys.modules` and loads those HA-free modules by file path, bypassing the real `__init__.py`. If you rename or restructure `custom_components/meowant/`, this loader needs to follow.
 - Each login sends exactly one attempt. The server locks the account (code 2342) after repeated failures, so never loop over account types or retry logins automatically.
 - `manifest.json`'s `requirements` is intentionally `[]`. The integration should need nothing beyond `aiohttp`, which Home Assistant core already ships. Don't add a requirements entry without a real reason.
 

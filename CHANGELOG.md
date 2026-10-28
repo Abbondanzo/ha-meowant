@@ -2,6 +2,20 @@
 
 Format based on [Keep a Changelog](https://keepachangelog.com/). Version numbers track `custom_components/meowant/manifest.json`.
 
+## [0.2.0] - 2026-10-28
+
+Live state and commands over Meowant's MQTT (IM) channel.
+
+### Added
+- Per litter box: a **Status** sensor (idle, cleaning, levelling, resetting, replacing litter, raking up, paused, blocked) with the raw work mode, state and cause codes as attributes.
+- Per litter box: **Clean**, **Level litter**, **Pause** and **Resume** buttons. Pause and resume act on whatever the box is currently doing.
+- One persistent MQTT-over-TLS connection per account, kept up in the background with backoff. The box reports each change as it happens (a clean starting, pausing or finishing), with a state request every 60 seconds as a backstop. If the connection is down, the live entities go unavailable and everything else keeps working.
+- Diagnostics include the live connection status and the latest raw work state.
+- Dev console: a Live tab to connect, request state, send operations and watch decoded incoming messages.
+
+### Changed
+- An expired token now triggers only one re-login, even when the REST poll and the live connection notice it at the same time.
+
 ## [0.1.0] - 2026-10-21
 
 First version with entities. Everything is read-only; nothing writes to the box.

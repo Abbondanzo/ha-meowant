@@ -10,9 +10,14 @@ through redact() first.
 """
 from __future__ import annotations
 
+import asyncio
+import itertools
 import logging
 import os
+import ssl
 import sys
+import time
+from collections import deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -33,6 +38,9 @@ MeowantApiError = _meowant_api.MeowantApiError
 MeowantAuthError = _meowant_api.MeowantAuthError
 new_device_id = _meowant_api.new_device_id
 normalize_area_code = _meowant_api.normalize_area_code
+# Registered in sys.modules by load_meowant_api().
+from custom_components.meowant.im import MeowantImSession  # noqa: E402
+from custom_components.meowant.mqtt import MqttError  # noqa: E402
 
 load_dotenv(REPO_ROOT / ".env", override=True)
 
@@ -45,6 +53,7 @@ DEVICE_ID_FILE = REPO_ROOT / ".dev_device_id"
 SENSITIVE_KEYS = {
     "token", "refreshtoken", "accesstoken", "authorization", "password", "mqttpassword",
     "phone", "mobile", "email", "account", "appkey", "app_key", "sign", "secret",
+    "mqttusername", "clientid",
 }
 
 
@@ -84,6 +93,8 @@ class LoginRequest(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
+    if _im is not None:
+        await _im.close()
     if _session is not None:
         await _session.close()
 
@@ -285,6 +296,110 @@ async def raw_request(req: RawRequest) -> dict[str, Any]:
     api = _require_api()
     log.info("Raw %s %s", req.method.upper(), req.path)
     return await _section(api.authed_request(req.method, req.path, req.body, req.headers))
+
+
+# --- IM / MQTT (live state and commands; see API.md) ---
+
+_im: "MeowantImSession | None" = None
+# Every decoded incoming message, newest last. Holds no credentials.
+_im_messages: deque[dict[str, Any]] = deque(maxlen=300)
+_im_ids = itertools.count(1)
+
+
+def _record_im(message, serial: str | None) -> None:
+    entry = {"id": next(_im_ids), "at_ms": int(time.time() * 1000), "serial": serial, **message.as_dict()}
+    _im_messages.append(redact(entry))
+
+
+def _im_status() -> dict[str, Any]:
+    connected = _im is not None and _im.connected
+    return {"connected": connected, "contacts": _im.contacts if connected else {}}
+
+
+def _last_im_id() -> int:
+    return _im_messages[-1]["id"] if _im_messages else 0
+
+
+def _require_im() -> "MeowantImSession":
+    if _im is None or not _im.connected:
+        raise HTTPException(status_code=409, detail="IM not connected. Connect first.")
+    return _im
+
+
+async def _collect_im(after: int, serial: str, seconds: float, until_state: bool) -> list[dict[str, Any]]:
+    """Messages that arrive within `seconds` (stopping early at a state reply from the box, if asked)."""
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        new = [m for m in _im_messages if m["id"] > after]
+        if until_state and any(m["serial"] == serial and "state" in m for m in new):
+            return new
+        await asyncio.sleep(0.1)
+    return [m for m in _im_messages if m["id"] > after]
+
+
+@app.post("/api/im/connect")
+async def im_connect() -> dict[str, Any]:
+    """Fetch MQTT credentials (im/login) and connect. Replaces any existing connection."""
+    global _im
+    api = _require_api()
+    if _im is not None:
+        await _im.close()
+    # MQTT doesn't go through MEOWANT_DEBUG_PROXY; it connects directly with normal TLS verification.
+    _im = MeowantImSession(api, ssl_context=ssl.create_default_context(), on_message=_record_im)
+    try:
+        await _im.connect()
+    except (MeowantApiError, MqttError) as err:
+        _im = None
+        return {"ok": False, "error": str(err)}
+    log.info("IM connected; contacts: %d", len(_im.contacts))
+    return {"ok": True, **_im_status()}
+
+
+@app.post("/api/im/disconnect")
+async def im_disconnect() -> dict[str, Any]:
+    global _im
+    if _im is not None:
+        await _im.close()
+        _im = None
+    return {"ok": True, **_im_status()}
+
+
+@app.get("/api/im/messages")
+async def im_messages(after: int = 0) -> dict[str, Any]:
+    return {**_im_status(), "messages": [m for m in _im_messages if m["id"] > after]}
+
+
+@app.post("/api/devices/{serial}/im/state")
+async def im_request_state(serial: str) -> dict[str, Any]:
+    """Send an all-state request and wait (up to 5 s) for the box's reply."""
+    session = _require_im()
+    after = _last_im_id()
+    try:
+        seq = await session.request_state(serial)
+    except (MeowantApiError, MqttError) as err:
+        return {"ok": False, "error": str(err)}
+    messages = await _collect_im(after, serial, 5, until_state=True)
+    state = next((m["state"] for m in reversed(messages) if m["serial"] == serial and "state" in m), None)
+    return {"ok": state is not None, "seq": seq, "state": state, "messages": messages,
+            **({} if state else {"error": "No state reply within 5 s"})}
+
+
+class OperationRequest(BaseModel):
+    op_mode: int
+    op_state: int
+
+
+@app.post("/api/devices/{serial}/im/operation")
+async def im_operation(serial: str, req: OperationRequest) -> dict[str, Any]:
+    """Send an operation (op mode + op state; see API.md) and collect replies for 3 s."""
+    session = _require_im()
+    log.info("IM operation on %s: mode=%d state=%d", serial, req.op_mode, req.op_state)
+    after = _last_im_id()
+    try:
+        seq = await session.send_operation(serial, req.op_mode, req.op_state)
+    except (MeowantApiError, MqttError) as err:
+        return {"ok": False, "error": str(err)}
+    return {"ok": True, "seq": seq, "messages": await _collect_im(after, serial, 3, until_state=False)}
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

@@ -6,6 +6,7 @@ _meowant_dev_import.py.
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import secrets
@@ -171,10 +172,17 @@ class MeowantApiClient:
         # (and counts toward the lockout), so reject non-ISO values up front.
         self._area_code = normalize_area_code(area_code)
         self._auth: AuthSession | None = None
+        # The coordinator and the IM connection share this client; serialize
+        # re-logins so an expired token never causes two password attempts.
+        self._login_lock = asyncio.Lock()
 
     @property
     def auth(self) -> AuthSession | None:
         return self._auth
+
+    @property
+    def tenant(self) -> Tenant:
+        return self._tenant
 
     async def login(self) -> AuthSession:
         """Authenticate. Raises MeowantAuthError on bad credentials."""
@@ -241,6 +249,22 @@ class MeowantApiClient:
         payload = {"eventTime": "0", "serialNumber": serial, "size": size, "messageType": message_type}
         return await self._authed("POST", "/catbox-server/web/box/record/new", payload)
 
+    # --- IM channel (see API.md "Commands and live state: IM/MQTT") ---
+
+    async def get_im_login(self) -> dict[str, Any]:
+        """MQTT credentials and topics for the IM channel. Contains secrets; never log it."""
+        data = await self._authed("POST", "/v1/ubtechinc-im-manager/im/login", {"type": 2})
+        if not isinstance(data, dict):
+            raise MeowantApiError("IM login response was not an object")
+        return data
+
+    async def get_im_friends(self) -> list[dict[str, Any]]:
+        """IM contacts. A box is the contact whose `userName` is its serial number."""
+        data = await self._authed("GET", "/v1/ubtechinc-im-manager/im/friends")
+        if not isinstance(data, list):
+            raise MeowantApiError("IM friends response was not a list")
+        return data
+
     # --- Per-box writes (see API.md "Write endpoints") ---
 
     async def reset_waste_bin(self, serial: str) -> Any:
@@ -306,20 +330,23 @@ class MeowantApiClient:
         payload: dict[str, Any] | None = None,
         extra_headers: dict[str, str] | None = None,
     ) -> Any:
-        if not self._token_usable():
-            await self.login()
-        assert self._auth is not None
+        token = await self._ensure_login()
         try:
-            return await self._request(
-                method, path, payload=payload, token=self._auth.token, extra_headers=extra_headers
-            )
+            return await self._request(method, path, payload=payload, token=token, extra_headers=extra_headers)
         except MeowantAuthError as err:
             if err.status != 401:
                 raise
-            await self.login()
-            return await self._request(
-                method, path, payload=payload, token=self._auth.token, extra_headers=extra_headers
-            )
+            token = await self._ensure_login(rejected=token)
+            return await self._request(method, path, payload=payload, token=token, extra_headers=extra_headers)
+
+    async def _ensure_login(self, rejected: str | None = None) -> str:
+        """A usable token, logging in only if needed. `rejected` is a token that just got a 401."""
+        async with self._login_lock:
+            # Another caller may have logged in while this one waited.
+            if not self._token_usable() or (self._auth is not None and self._auth.token == rejected):
+                await self.login()
+            assert self._auth is not None
+            return self._auth.token
 
     def _token_usable(self) -> bool:
         if self._auth is None:

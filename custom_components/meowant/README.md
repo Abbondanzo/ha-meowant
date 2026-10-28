@@ -31,7 +31,7 @@ Settings → Devices & Services → **Add Integration** → search "Meowant". Yo
 
 ## What you get
 
-Everything is read-only for now: the integration never changes the box's settings or runs it.
+Everything comes from the cloud. Settings are read-only: the integration never changes the box's configuration. It can run the box (clean, level, pause, resume) over Meowant's live channel.
 
 **Per litter box** (one device, with model, serial and firmware):
 
@@ -46,12 +46,17 @@ Everything is read-only for now: the integration never changes the box's setting
 | Online | Whether the box is connected |
 | Activity (event) | Fires `cat_visit`, `scheduled_clean`, `auto_clean` or `other` for each new record, for automations |
 | Last device event, Auto-clean delay | Diagnostic |
+| Status | What the box is doing right now: idle, cleaning, levelling, resetting, replacing litter, raking up, paused or blocked (live) |
+| Clean / Level litter | Start a clean or level the litter (live) |
+| Pause / Resume | Pause or resume the current clean or level (live) |
 
 **Per cat** (one device each, model = breed): Weight, Visits today, Time in box today. The "today" counters come straight from the app's cat profile and haven't been checked against a full day yet.
 
 The box can only identify a cat by weight once that's set up in the app. Visits it can't match show no cat.
 
 Polling runs every 60 seconds: about 8 small requests per box per minute.
+
+Entities marked *live* use a separate, always-on connection to Meowant's MQTT channel, the same one the app uses for commands. The box reports each change as it happens (a clean starting, pausing or finishing), and the integration also asks every 60 seconds in case one is missed. If that connection drops, the live entities go unavailable and reconnect on their own. Everything else keeps working.
 
 A cat-visit automation example:
 

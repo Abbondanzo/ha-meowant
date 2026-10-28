@@ -1,4 +1,4 @@
-"""Sensors for Meowant litter boxes and cats (read-only)."""
+"""Sensors for Meowant litter boxes and cats."""
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -18,7 +18,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import MeowantConfigEntry
 from .coordinator import MeowantCoordinator
-from .entity import MeowantBoxEntity, MeowantCatEntity
+from .entity import MeowantBoxEntity, MeowantCatEntity, MeowantLiveEntity
+from .im_proto import WorkState
 from .models import BoxState, Cat, Record
 
 EVENT_NAMES = {21: "cat_visit", 33: "scheduled_clean", 47: "auto_clean"}
@@ -166,6 +167,7 @@ async def async_setup_entry(
         for serial in coordinator.data.boxes
         for description in BOX_SENSORS
     )
+    async_add_entities(MeowantStatusSensor(coordinator, serial) for serial in coordinator.data.boxes)
 
     # Cats can be added in the app later; pick them up on future polls.
     known_cats: set[int] = set()
@@ -202,6 +204,39 @@ class MeowantBoxSensor(MeowantBoxEntity, SensorEntity):
         if not box or not self.entity_description.attrs_fn:
             return None
         return self.entity_description.attrs_fn(box, self.coordinator)
+
+
+class MeowantStatusSensor(MeowantLiveEntity, SensorEntity):
+    """What the box is doing right now, from the live (MQTT) connection."""
+
+    _attr_translation_key = "status"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = ["idle", "resetting", "cleaning", "levelling", "replacing_litter", "raking_up", "paused", "blocked"]
+
+    def __init__(self, coordinator: MeowantCoordinator, serial: str) -> None:
+        super().__init__(coordinator, serial, "status")
+
+    @property
+    def _state(self) -> WorkState | None:
+        return self.coordinator.live.state(self._serial)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self._state is not None
+
+    @property
+    def native_value(self) -> str | None:
+        state = self._state
+        return state.status if state else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        # Raw codes, since most aren't decoded yet (see API.md). Not the full
+        # field dump: its timestamp changes every reply and would bloat history.
+        state = self._state
+        if state is None:
+            return None
+        return {"work_mode": state.work_mode, "work_state": state.work_state, "cause": state.cause}
 
 
 class MeowantCatSensor(MeowantCatEntity, SensorEntity):

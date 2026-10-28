@@ -221,6 +221,56 @@
       </div>
     </section>
 
+    <!-- Live (IM / MQTT): logic in live.js -->
+    <section data-tab="live" class="stack">
+      <div class="grid-wide">
+        <div class="card">
+          <h2>Connection</h2>
+          <p class="muted small">MQTT over TLS to the IM channel (API.md "Commands and live state"). Connecting calls <code>im/login</code>, which may hand out a fresh IM session; unknown whether that affects the phone app.</p>
+          <div class="toolbar">
+            <button type="button" id="im-connect">Connect</button>
+            <button type="button" class="secondary" id="im-disconnect">Disconnect</button>
+            <span id="im-status" class="muted small">Not connected</span>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Work state</h2>
+          <div class="toolbar"><button type="button" id="im-state">Request state</button></div>
+          <div id="im-state-view" style="margin-top:10px"><p class="muted small">No reply yet.</p></div>
+        </div>
+        <div class="card">
+          <h2>Operations</h2>
+          <p class="warn small">These run the motor. Check no cat is in the box.</p>
+          <div class="toolbar">
+            <button type="button" data-op="1,1">Start clean</button>
+            <button type="button" class="secondary" data-op="1,2">Pause clean</button>
+            <button type="button" class="secondary" data-op="1,3">Resume clean</button>
+          </div>
+          <div class="toolbar" style="margin-top:8px">
+            <button type="button" data-op="3,1">Start level</button>
+            <button type="button" class="secondary" data-op="3,2">Pause level</button>
+            <button type="button" class="secondary" data-op="3,3">Resume level</button>
+          </div>
+          <div class="toolbar" style="margin-top:8px">
+            <button type="button" class="secondary" data-op="7,1">Rise</button>
+            <button type="button" class="secondary" data-op="8,1">Drop</button>
+          </div>
+          <form class="row" id="im-op-form" style="margin-top:12px">
+            <label>Op mode <input type="number" name="op_mode" min="0" required></label>
+            <label>Op state <input type="number" name="op_state" min="0" required></label>
+            <button type="submit">Send</button>
+          </form>
+        </div>
+      </div>
+      <div class="card">
+        <div class="toolbar" style="justify-content:space-between;margin-bottom:6px">
+          <h2 style="margin:0">Incoming messages</h2>
+          <button type="button" class="ghost" id="im-clear">Clear</button>
+        </div>
+        <div id="im-messages"><p class="muted small">Nothing received yet.</p></div>
+      </div>
+    </section>
+
     <!-- Console -->
     <section data-tab="console" class="stack">
       <div class="card">
@@ -265,7 +315,7 @@
 const $ = (id) => document.getElementById(id);
 const STORE_KEY = "meowant-dev-console";
 const TABS = [["overview", "Overview"], ["activity", "Activity"], ["cats", "Cats"], ["settings", "Settings"],
-  ["actions", "Actions"], ["console", "Console"], ["log", "Log"]];
+  ["actions", "Actions"], ["live", "Live"], ["console", "Console"], ["log", "Log"]];
 const EVENT_TYPES = { 21: "Cat visit", 33: "Scheduled clean", 47: "Clean after visit (likely)" };
 
 let serial = null;
@@ -736,5 +786,6 @@ $("clear-log").addEventListener("click", () => {
   } catch {}
 })();
 </script>
+<script src="live.js"></script>
 </body>
 </html>

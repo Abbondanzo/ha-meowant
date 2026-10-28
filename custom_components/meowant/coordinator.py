@@ -13,6 +13,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import MeowantApiClient, MeowantApiError, MeowantAuthError
 from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN, RECORDS_PER_POLL
+from .live import MeowantLive
 from .models import BoxState, Cat, Record, parse_cats
 
 _LOGGER = logging.getLogger(__name__)
@@ -28,7 +29,10 @@ class MeowantData:
 
 
 class MeowantCoordinator(DataUpdateCoordinator[MeowantData]):
-    """Polls every box on the account (read-only) on a fixed interval."""
+    """Polls every box on the account over REST on a fixed interval.
+
+    Live work state and commands go over MQTT instead, through `live`.
+    """
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, api: MeowantApiClient) -> None:
         super().__init__(
@@ -40,6 +44,7 @@ class MeowantCoordinator(DataUpdateCoordinator[MeowantData]):
         )
         self.api = api
         self._seen_records: dict[str, set[int]] = {}
+        self.live = MeowantLive(hass, entry, api, lambda: list(self.data.boxes) if self.data else [])
 
     async def _async_update_data(self) -> MeowantData:
         try:

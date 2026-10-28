@@ -35,6 +35,7 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: Meowant
             "entry": dict(entry.data),
             "boxes": [box.raw for box in data.boxes.values()] if data else [],
             "cat_count": len(data.cats) if data else 0,
+            "live": entry.runtime_data.live.diagnostics(),
         },
         TO_REDACT,
     )

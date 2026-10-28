@@ -2,7 +2,7 @@
 
 Reference for the cloud API behind the official **AIR PET** app (iOS id1643683280), which Meowant litter boxes (SC-01, SC-02) use. Meowant boxes are rebranded UBTech **UBPet / UPET / Airrobo** devices, so they share the UBTech "AirPet" cloud platform.
 
-**Status:** login and the device list are verified against a live Meowant account (AIR PET 2.1.9 and this repo's client, 2026-10-21). Everything else comes from secondary sources (see [Sources](#sources)) and is marked by confidence.
+**Status:** login and the device list are verified against a live Meowant account (AIR PET 2.1.9 and this repo's client, 2026-10-21). Everything else comes from secondary sources (see [Sources](#sources)) and is marked by confidence. The IM/MQTT channel is verified against a live Meowant SC-01 (2026-10-28).
 
 ## Tenants
 
@@ -237,17 +237,121 @@ Response shapes as returned in `data`. Values are examples; personal fields are 
 
 ## Commands and live state: IM/MQTT
 
-Actions (clean, level, pause) and live work state do **not** go over REST. They go over UBTech's IM channel:
+Actions (clean, level, pause/resume) and live work state do **not** go over REST. They go over UBTech's IM (instant messaging) channel, which runs on MQTT. The protocol comes from upet-hass (UPET brand, same platform). **Verified against a Meowant SC-01 on 2026-10-28** (this repo's dev console, from an account the box is shared to): connect, all-state, start/pause/resume clean and level, receipts, acks and state pushes all behave as described here.
 
-- `POST /v1/ubtechinc-im-manager/im/login` with `{"type": 2}` returns MQTT credentials (`mqttUserName`, `mqttPassword`, `pubTopic`, sender UID).
-- `GET /v1/ubtechinc-im-manager/im/friends` lists contacts. The box is the contact whose `userName` equals its serial number, and its `userId` is the target UID.
-- MQTT over **TLS, port 21000**, on the same host as the REST base URL.
-- Payload nesting: IM `Message` → `MessageContent` (custom) → protobuf `Any(BytesValue)` → `CommandProto(protype=2)` → RISP frame → AirPet protobuf body.
-- RISP command `0x3fd` requests state, and `0x3fb` sends an operation.
-- Operation bodies: clean `08011001`, level `08031001`, rise `08071001`, drop `08081001`. The last byte selects start (1), pause (2) or resume (3), e.g. pause clean = `08011002`.
-- Work modes: 1 = CLEAN, 3 = SMOOTHING, 7 = RISE, 8 = DROP. Quirk: SC-01 firmware can report mode IDLE (0) with state RUNNING while it's actually ready. Treat IDLE mode as idle regardless of state.
+### Getting MQTT credentials (REST, logged in)
 
-Implementing this needs an MQTT client plus hand-rolled protobuf encoding. That's the bulk of the work beyond REST.
+- `POST /v1/ubtechinc-im-manager/im/login` with `{"type": 2}` returns the MQTT login: `clientId`, `mqttUserName`, `mqttPassword`, `pubTopic`, `subTopic`, and possibly the account's IM `uid`. The account's IM uid is the same as the REST `user.userId` (verified: box replies are addressed to it). Calling it may hand out a fresh session; whether that affects the phone app's own IM session is unknown.
+- `GET /v1/ubtechinc-im-manager/im/friends` lists IM contacts. The box is the contact whose `userName` equals its serial number; its `userId` is the box's IM uid (the message target).
+
+### Connection
+
+- MQTT 3.1.1 over **TLS, port 21000**, on the REST base URL's host (`apis.airrobo-home.com`).
+- CONNECT with `clientId` / `mqttUserName` / `mqttPassword`, clean session, keepalive 20 s. SUBSCRIBE to `subTopic` at QoS 1. PUBLISH requests to `pubTopic` at QoS 0.
+
+### Message nesting
+
+Every payload is protobuf (proto3: zero/empty fields omitted), nested five deep:
+
+```
+IM Message
+  1 cid (string)          "<ms>+<6-digit random>"
+  2 gid (string)          (ms << 20) + counter, as a decimal string
+  3 createdAt (varint)    ms when we send; the box sends **seconds**
+  4 from (string)         account IM uid
+  5 to (string)           box IM uid
+  6 type (varint)         seen on incoming messages
+  7 content (bytes)  -->  MessageContent
+                            1 type (string)  "custom"
+                            2 body (bytes) -->  google.protobuf.Any
+                                                  1 type_url  "type.googleapis.com/google.protobuf.BytesValue"
+                                                  2 value -->  BytesValue
+                                                                 1 value -->  CommandProto
+                                                                                1 protype (varint)  2 = RISP
+                                                                                2 frame (bytes) --> RISP frame
+  8 version (string)      "1.0.1"
+```
+
+Delivery receipts come back from the server (not the box) for every message we publish, as `Any` with type_url `type.googleapis.com/rosa.im.protobuf.ReceiptNotification`: `1` status (`receipt/success`, `receipt/unreachable`), `2` cause (e.g. `send message success`). The receipt's outer `cid` and `createdAt` are those of the message it acknowledges; its MessageContent type is `receipt` and outer `type` is 2.
+
+### RISP frame
+
+```
+0xDB | header length (1 byte) | header | CRC8(header) | body | CRC8(body)   (body + its CRC omitted when empty)
+
+header (protobuf):  1 dev = 2 (AirPet)   2 cmd   4 body length   5 attr   7 seq (1..0x7FFF, wraps)
+attr:               1 = request (ours)   2 = reply (echoes our seq)   6 = push from the box (its own seq counter)
+CRC8: poly 0x07, init 0x00, final XOR 0x55
+```
+
+| cmd | Meaning | Body |
+|---|---|---|
+| `0x3FD` | request all state; the reply (attr 2) uses the same cmd | empty → all-state body below |
+| `0x3FB` | operation; the box acks (attr 2, same seq) with an empty body | `1` op mode, `2` op state |
+| `0x400` | **pushed by the box** (attr 6) on every work-state change | all-state body below |
+| `0x3FF` | pushed by the box (attr 6) when a clean or level finished, right after the `0x400` | unknown: `2` = 2000 and `3` = 1 every time; `1` differs each time, e.g. 0xFFDF6FE9 (−2134039 as int32) |
+
+The CRC model above checks out on frames from the box too.
+
+Reference frames with seq 1: state request `db09080210fd0728013801f6`; start clean `db0b080210fb072004280138018b08011001de`.
+
+### Operations (what you send)
+
+| Op mode | | Op state | |
+|---|---|---|---|
+| 1 | clean | 1 | start |
+| 3 | level (smooth) litter | 2 | pause |
+| 7 | rise | 3 | resume |
+| 8 | drop | | |
+
+Rise/drop are only known to take "start". Bodies: start clean `08011001`, pause clean `08011002`, resume clean `08011003`, start level `08031001`. Start, pause and resume of both clean and level are verified on an SC-01; within ~150 ms the box acks and pushes its new state. Start rise (`08071001`) is acked but produced no state push and no visible state change.
+
+### All-state body (what the box reports, in `0x3FD` replies and `0x400` pushes)
+
+Body fields (all varints): `1` work mode, `2` work state, `3` cause, `4` toilet, `5` foreign object, `6` weigh, `7` lid, `8` motor, `9` key, `10` object, `11` camera, `12` image ctrl, `13` picture ctrl, `14` update, `15` hall, `16` infrared, `17` box, `18` timestamp (Unix **seconds**), `19` weigh sensor, `20` LED. Most sub-state values aren't decoded yet; on an SC-01 only fields 1, 2, 3 and 18 have been non-zero so far.
+
+Observed on an SC-01 (2026-10-28), operations started from the app:
+
+| Moment | Mode | State | Cause |
+|---|---|---|---|
+| At rest | 0 | 1 | 90 |
+| After start clean / resume clean | 2 | 1 | 50 |
+| After pause clean | 2 | 3 | 60 |
+| Clean finished by itself (~90 s of cleaning) | 0 | 1 | 90 |
+| After start level / resume level | 3 | 1 | 100 |
+| After pause level | 3 | 3 | 110 |
+| Level finished by itself | 0 | 1 | 140 |
+
+So `cause` looks like the reason for the current state, specific to the operation: clean runs/pauses/finishes as 50/60/90 and level as 100/110/140. Inferred from these runs only.
+
+| Work mode | | Work state | |
+|---|---|---|---|
+| 0 | idle | 0 | idle |
+| 1 | resetting | 1 | running |
+| 2 | cleaning | 2 | blocked |
+| 3 | levelling | 3 | paused |
+| 4 | replacing litter | | |
+| 5 | raking up | | |
+
+Note the work-mode numbers differ from the op-mode numbers above (cleaning is op mode 1 but work mode 2). Quirk (SC-01, per upet-hass PR #5, and confirmed: it's how an idle SC-01 always reports): work mode 0 with state 1 (running). Treat mode 0 as idle regardless of state.
+
+Because proto3 omits zero fields, a box that's idle with every sub-state at 0 should reply with an **empty** body (`dataLen` 0, no body CRC). So recognize a reply by its sender (the box's uid) and cmd, not by whether it has a body. Our own request has an empty body too, but comes from the account uid.
+
+### How this repo uses it
+
+`im_proto.py` (encoding), `mqtt.py` (a minimal MQTT 3.1.1 client: no paho-mqtt dependency) and `im.py` (the session) implement the above. The HA integration's `live.py` keeps **one persistent connection per config entry**, not one per command as upet-hass does. So `im/login` runs once per connection, not on every poll. State comes mainly from the box's `0x400` pushes. An all-state request every 60 s is a backstop that also gets the state right after connecting. It reconnects with backoff (30 s doubling to 15 min) and stops for good on auth/lockout errors, so it never adds password logins toward the lockout.
+
+### Open questions
+
+Answered on 2026-10-28: the Meowant tenant accepts all of this as-is; replies use attr 2 and pushes attr 6; the box pushes state on every change, including a clean finishing by itself; a **shared** account can send operations; receipts carry the acknowledged message's `cid`.
+
+Still open:
+
+- Does holding an IM connection (or calling `im/login`) disconnect the phone app's own IM session?
+- Does the box push for cleans it starts itself (scheduled, or after a visit), as it did for one finishing by itself?
+- What do rise (7) and drop (8) physically do? Rise is acked but changes no reported state; drop is untested.
+- Sub-state values (`toilet`, `lid`, `weigh`, ...) and the full set of `cause` codes. What is the `0x3FF` push?
+- What does `receipt/unreachable` look like when the box is offline?
 
 ## Sources
 

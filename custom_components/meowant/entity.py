@@ -1,7 +1,9 @@
 """Base entities for Meowant: one HA device per litter box, one per cat."""
 from __future__ import annotations
 
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -37,6 +39,25 @@ class MeowantBoxEntity(CoordinatorEntity[MeowantCoordinator]):
     @property
     def available(self) -> bool:
         return super().available and self.box is not None
+
+
+class MeowantLiveEntity(MeowantBoxEntity):
+    """A box entity driven by the live (MQTT) connection rather than REST polls."""
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_dispatcher_connect(self.hass, self.coordinator.live.signal, self._handle_live_update)
+        )
+
+    @callback
+    def _handle_live_update(self) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def available(self) -> bool:
+        # Independent of REST poll failures: only the box having been seen matters.
+        return self.box is not None and self.coordinator.live.connected
 
 
 class MeowantCatEntity(CoordinatorEntity[MeowantCoordinator]):

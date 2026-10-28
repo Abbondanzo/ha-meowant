@@ -14,6 +14,20 @@
         }
       }
     },
+    "button": {
+      "clean": {
+        "default": "mdi:broom"
+      },
+      "level": {
+        "default": "mdi:wave"
+      },
+      "pause": {
+        "default": "mdi:pause"
+      },
+      "resume": {
+        "default": "mdi:play"
+      }
+    },
     "event": {
       "activity": {
         "default": "mdi:cat"
@@ -55,6 +69,16 @@
       },
       "cat_time_in_box_today": {
         "default": "mdi:timer-outline"
+      },
+      "status": {
+        "default": "mdi:list-status",
+        "state": {
+          "idle": "mdi:check-circle-outline",
+          "cleaning": "mdi:broom",
+          "levelling": "mdi:wave",
+          "paused": "mdi:pause-circle-outline",
+          "blocked": "mdi:alert-circle-outline"
+        }
       }
     }
   }

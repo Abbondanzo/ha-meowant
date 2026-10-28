@@ -42,6 +42,20 @@
         "name": "Deodorant expired"
       }
     },
+    "button": {
+      "clean": {
+        "name": "Clean"
+      },
+      "level": {
+        "name": "Level litter"
+      },
+      "pause": {
+        "name": "Pause"
+      },
+      "resume": {
+        "name": "Resume"
+      }
+    },
     "event": {
       "activity": {
         "name": "Activity",
@@ -93,7 +107,34 @@
       },
       "cat_time_in_box_today": {
         "name": "Time in box today"
+      },
+      "status": {
+        "name": "Status",
+        "state": {
+          "idle": "Idle",
+          "resetting": "Resetting",
+          "cleaning": "Cleaning",
+          "levelling": "Levelling",
+          "replacing_litter": "Replacing litter",
+          "raking_up": "Raking up",
+          "paused": "Paused",
+          "blocked": "Blocked"
+        }
       }
+    }
+  },
+  "exceptions": {
+    "live_not_connected": {
+      "message": "Not connected to the litter box's live channel. Try again shortly."
+    },
+    "command_failed": {
+      "message": "Couldn't send the command: {error}"
+    },
+    "nothing_to_pause": {
+      "message": "The litter box isn't cleaning or levelling, so there's nothing to pause."
+    },
+    "nothing_to_resume": {
+      "message": "The litter box doesn't have a paused clean or level to resume."
     }
   }
 }

@@ -32,6 +32,18 @@ DEFAULT_AREA_CODE = "US"
 # Re-login this long before the token's stated expiry.
 TOKEN_REFRESH_MARGIN = timedelta(minutes=5)
 
+# --- IM channel (MQTT over TLS on the base URL's host; see API.md) ---
+MQTT_PORT = 21000
+MQTT_KEEPALIVE = 20  # seconds, as the app sends it
+
+# Live state: the box pushes every change; this all-state poll is a backstop.
+LIVE_POLL_INTERVAL = timedelta(seconds=60)
+# A box that hasn't answered for this long shows as unavailable.
+LIVE_STATE_MAX_AGE = timedelta(minutes=3)
+# Reconnect backoff. Each reconnect fetches fresh MQTT credentials over REST.
+LIVE_RETRY_MIN = timedelta(seconds=30)
+LIVE_RETRY_MAX = timedelta(minutes=15)
+
 # --- Config entry keys ---
 CONF_DEVICE_ID = "device_id"
 CONF_AREA_CODE = "area_code"

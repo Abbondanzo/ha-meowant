@@ -232,3 +232,59 @@ def test_authed_requests_send_language_header_but_login_does_not():
     asyncio.run(api._request("GET", "/cats", payload=None, token="t"))
     assert "x-ubt-language" not in seen[0]
     assert seen[1]["x-ubt-language"] == "en"
+
+
+def test_concurrent_calls_with_expired_token_log_in_once():
+    # The coordinator and the IM connection share one client. Logins count
+    # toward the server's lockout, so two callers must not both log in.
+    import asyncio
+
+    from custom_components.meowant.api import AuthSession, MeowantApiClient
+
+    api = MeowantApiClient(None, "a@b.com", "pw", device_id="d", tenant=Tenant("u", "i", "k", "p"))
+    api._auth = AuthSession(token="old", expires_at_ms=1, user_id="1", account_type=1)
+    logins = []
+
+    async def fake_request(method, path, *, payload, token, extra_headers=None):
+        if path.endswith("/user/login"):
+            logins.append(1)
+            await asyncio.sleep(0.01)
+            return {"token": {"token": "new", "expireAt": 2**53}, "user": {"userId": 1}}
+        assert token == "new"
+        return []
+
+    api._request = fake_request
+
+    async def run():
+        await asyncio.gather(api.get_im_friends(), api.get_devices(), api.get_cats())
+
+    asyncio.run(run())
+    assert len(logins) == 1
+
+
+def test_401_relogs_in_once_across_concurrent_callers():
+    import asyncio
+    import time
+
+    from custom_components.meowant.api import AuthSession, MeowantApiClient
+
+    api = MeowantApiClient(None, "a@b.com", "pw", device_id="d", tenant=Tenant("u", "i", "k", "p"))
+    api._auth = AuthSession(token="old", expires_at_ms=int(time.time() * 1000) + 3_600_000, user_id="1", account_type=1)
+    logins = []
+
+    async def fake_request(method, path, *, payload, token, extra_headers=None):
+        if path.endswith("/user/login"):
+            logins.append(1)
+            return {"token": {"token": "new", "expireAt": 2**53}, "user": {"userId": 1}}
+        if token == "old":
+            await asyncio.sleep(0.01)
+            raise MeowantAuthError("HTTP 401", status=401)
+        return []
+
+    api._request = fake_request
+
+    async def run():
+        await asyncio.gather(api.get_im_friends(), api.get_devices())
+
+    asyncio.run(run())
+    assert len(logins) == 1
