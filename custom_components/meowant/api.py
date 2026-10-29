@@ -14,7 +14,8 @@ import string
 import time
 import urllib.parse
 import uuid
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
 from typing import Any
 
 import aiohttp
@@ -49,6 +50,10 @@ class MeowantApiError(Exception):
         super().__init__(message)
         self.status = status
         self.code = code
+
+
+class MeowantConnectionError(MeowantApiError):
+    """The server couldn't be reached (connect failure or timeout), as opposed to an error reply."""
 
 
 class MeowantRateLimitError(MeowantApiError):
@@ -86,6 +91,24 @@ class AuthSession:
     expires_at_ms: int | None
     user_id: str | None
     account_type: int
+
+    def as_dict(self) -> dict[str, Any]:
+        """For persisting (the token is a secret: store it like the password, never log it)."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Any) -> AuthSession | None:
+        if not isinstance(data, dict) or not data.get("token"):
+            return None
+        try:
+            return cls(
+                token=str(data["token"]),
+                expires_at_ms=int(data["expires_at_ms"]) if data.get("expires_at_ms") is not None else None,
+                user_id=str(data["user_id"]) if data.get("user_id") is not None else None,
+                account_type=int(data["account_type"]),
+            )
+        except (KeyError, TypeError, ValueError):
+            return None
 
 
 def new_device_id() -> str:
@@ -162,7 +185,11 @@ class MeowantApiClient:
         device_id: str,
         tenant: Tenant | None = None,
         area_code: str | None = None,
+        auth: AuthSession | None = None,
+        on_login: Callable[[AuthSession], None] | None = None,
     ) -> None:
+        """`auth` is a saved session to reuse, so a restart doesn't cost a login.
+        `on_login` is called with each new session, to save it."""
         self._session = session
         self._email = email
         self._password = password
@@ -171,7 +198,8 @@ class MeowantApiClient:
         # The server looks accounts up per region: a wrong areaCode gives 2004
         # (and counts toward the lockout), so reject non-ISO values up front.
         self._area_code = normalize_area_code(area_code)
-        self._auth: AuthSession | None = None
+        self._auth = auth
+        self._on_login = on_login
         # The coordinator and the IM connection share this client; serialize
         # re-logins so an expired token never causes two password attempts.
         self._login_lock = asyncio.Lock()
@@ -214,6 +242,8 @@ class MeowantApiClient:
                 user_id=str(user["userId"]) if user.get("userId") is not None else None,
                 account_type=account_type,
             )
+            if self._on_login is not None:
+                self._on_login(self._auth)
             return self._auth
         # "Wrong password" from one account type beats "no such user" from another.
         best = next((e for e in errors if e.code == _CODE_BAD_PASSWORD), errors[-1])
@@ -400,6 +430,6 @@ class MeowantApiClient:
                     body = None
                 return unwrap(resp.status, body)
         except aiohttp.ClientError as err:
-            raise MeowantApiError(f"Request to {path} failed: {err}") from err
+            raise MeowantConnectionError(f"Request to {path} failed: {err}") from err
         except TimeoutError as err:
-            raise MeowantApiError(f"Request to {path} timed out") from err
+            raise MeowantConnectionError(f"Request to {path} timed out") from err

@@ -24,7 +24,7 @@ from .api import (
     new_device_id,
     normalize_area_code,
 )
-from .const import CONF_AREA_CODE, CONF_DEVICE_ID, DEFAULT_AREA_CODE, DOMAIN
+from .const import CONF_AREA_CODE, CONF_AUTH, CONF_DEVICE_ID, DEFAULT_AREA_CODE, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -98,6 +98,8 @@ class MeowantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         **user_input,
                         CONF_AREA_CODE: area_code,
                         CONF_DEVICE_ID: device_id,
+                        # Setup reuses this session instead of logging in a second time.
+                        CONF_AUTH: api.auth.as_dict() if api.auth else None,
                     },
                 )
 
@@ -147,7 +149,11 @@ class MeowantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             else:
                 return self.async_update_reload_and_abort(
                     reauth_entry,
-                    data={**reauth_entry.data, CONF_PASSWORD: user_input[CONF_PASSWORD]},
+                    data={
+                        **reauth_entry.data,
+                        CONF_PASSWORD: user_input[CONF_PASSWORD],
+                        CONF_AUTH: api.auth.as_dict() if api.auth else None,
+                    },
                 )
 
         return self.async_show_form(

@@ -54,9 +54,9 @@ Everything comes from the cloud. Settings are read-only: the integration never c
 
 The box can only identify a cat by weight once that's set up in the app. Visits it can't match show no cat.
 
-Polling runs every 60 seconds: about 8 small requests per box per minute.
+Cat visits, cleans, waste bin and online status refresh every 5 minutes, and right away when a clean or level finishes. The device list, settings and deodorant refresh every 30 minutes. That's about 60 small requests an hour for one box. Meowant's cloud blocks connections that make too many requests, so the integration keeps this low on purpose.
 
-Entities marked *live* use a separate, always-on connection to Meowant's MQTT channel, the same one the app uses for commands. The box reports each change as it happens (a clean starting, pausing or finishing), and the integration also asks every 60 seconds in case one is missed. If that connection drops, the live entities go unavailable and reconnect on their own. Everything else keeps working.
+Entities marked *live* use a separate, always-on connection to Meowant's MQTT channel, the same one the app uses for commands. The box reports each change as it happens (a clean starting, pausing or finishing), and the integration also asks every 15 minutes in case one is missed. If that connection drops, the live entities go unavailable and reconnect on their own. Everything else keeps working.
 
 A cat-visit automation example:
 

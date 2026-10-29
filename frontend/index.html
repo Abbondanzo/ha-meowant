@@ -123,9 +123,8 @@
       <button id="refresh-btn" class="secondary" type="button">Refresh</button>
       <select id="auto-refresh" style="width:auto" aria-label="Auto-refresh">
         <option value="0">Auto-refresh off</option>
-        <option value="30">Every 30 s</option>
-        <option value="60">Every 60 s</option>
         <option value="300">Every 5 min</option>
+        <option value="1800">Every 30 min</option>
       </select>
       <span id="refreshed-at" class="muted small"></span>
       <button id="show-login" class="ghost" type="button">Switch account</button>
@@ -637,7 +636,12 @@ function prefillForms(config) {
   }
 }
 
+// Each refresh is 6 upstream requests. Faster options were removed after
+// Meowant's cloud blackholed the home IP; an old saved 30/60 s falls back to off.
+const AUTO_REFRESH_CHOICES = [0, 300, 1800];
+
 function setAutoRefresh(seconds) {
+  if (!AUTO_REFRESH_CHOICES.includes(seconds)) seconds = 0;
   clearInterval(autoTimer);
   autoTimer = seconds ? setInterval(refreshState, seconds * 1000) : null;
   $("auto-refresh").value = String(seconds);

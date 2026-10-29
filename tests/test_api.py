@@ -288,3 +288,64 @@ def test_401_relogs_in_once_across_concurrent_callers():
 
     asyncio.run(run())
     assert len(logins) == 1
+
+
+def test_auth_session_round_trip_and_garbage():
+    from custom_components.meowant.api import AuthSession
+
+    auth = AuthSession(token="t", expires_at_ms=123, user_id="7", account_type=1)
+    assert AuthSession.from_dict(auth.as_dict()) == auth
+    for bad in (None, {}, {"token": ""}, {"token": "t"}, {"token": "t", "account_type": "x"}, "t"):
+        assert AuthSession.from_dict(bad) is None
+
+
+def test_saved_session_is_reused_without_login():
+    # A restart or setup retry with a saved, unexpired token must not log in.
+    import asyncio
+    import time
+
+    from custom_components.meowant.api import AuthSession, MeowantApiClient
+
+    saved = AuthSession(token="saved", expires_at_ms=int(time.time() * 1000) + 3_600_000, user_id="1", account_type=1)
+    paths = []
+
+    async def fake_request(method, path, *, payload, token, extra_headers=None):
+        paths.append((path, token))
+        return []
+
+    api = MeowantApiClient(None, "a@b.com", "pw", device_id="d", tenant=Tenant("u", "i", "k", "p"), auth=saved)
+    api._request = fake_request
+    asyncio.run(api.get_devices())
+    assert paths == [("/user-service-rest/v2/robot/common/device/list", "saved")]
+
+
+def test_on_login_receives_new_session():
+    import asyncio
+
+    from custom_components.meowant.api import MeowantApiClient
+
+    saved = []
+
+    async def fake_request(method, path, *, payload, token, extra_headers=None):
+        return {"token": {"token": "new", "expireAt": 99}, "user": {"userId": 5}}
+
+    api = MeowantApiClient(None, "a@b.com", "pw", device_id="d", tenant=Tenant("u", "i", "k", "p"), on_login=saved.append)
+    api._request = fake_request
+    asyncio.run(api.login())
+    assert [(a.token, a.expires_at_ms, a.user_id) for a in saved] == [("new", 99, "5")]
+
+
+def test_unreachable_server_raises_connection_error():
+    import asyncio
+
+    import aiohttp
+
+    from custom_components.meowant.api import MeowantApiClient, MeowantConnectionError
+
+    class DeadSession:
+        def request(self, *args, **kwargs):
+            raise aiohttp.ClientConnectionError("connect timed out")
+
+    api = MeowantApiClient(DeadSession(), "a@b.com", "pw", device_id="d", tenant=Tenant("u", "i", "k", "p"))
+    with pytest.raises(MeowantConnectionError):
+        asyncio.run(api.login())

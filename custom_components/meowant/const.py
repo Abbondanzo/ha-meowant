@@ -36,21 +36,37 @@ TOKEN_REFRESH_MARGIN = timedelta(minutes=5)
 MQTT_PORT = 21000
 MQTT_KEEPALIVE = 20  # seconds, as the app sends it
 
+# Request volume matters: Meowant's cloud has blackholed a whole home IP (app
+# included) after a day of dev testing plus 8 req/min of polling. Keep every
+# interval here generous.
+
 # Live state: the box pushes every change; this all-state poll is a backstop.
-LIVE_POLL_INTERVAL = timedelta(seconds=60)
-# A box that hasn't answered for this long shows as unavailable.
-LIVE_STATE_MAX_AGE = timedelta(minutes=3)
-# Reconnect backoff. Each reconnect fetches fresh MQTT credentials over REST.
+LIVE_POLL_INTERVAL = timedelta(minutes=15)
+# A box that hasn't been heard from for this long shows as unavailable.
+LIVE_STATE_MAX_AGE = timedelta(minutes=40)
+# Reconnect backoff. Each reconnect costs two REST calls (im/login, im/friends).
 LIVE_RETRY_MIN = timedelta(seconds=30)
 LIVE_RETRY_MAX = timedelta(minutes=15)
+# The backoff only resets after a connection has stayed up this long, so a
+# connect-then-drop cycle backs off instead of reconnecting every LIVE_RETRY_MIN.
+LIVE_STABLE_AFTER = timedelta(minutes=10)
 
 # --- Config entry keys ---
 CONF_DEVICE_ID = "device_id"
 CONF_AREA_CODE = "area_code"
+# The last login session (token + expiry), reused across restarts. Secret, like the password.
+CONF_AUTH = "auth"
 
 # --- Coordinator ---
-DEFAULT_UPDATE_INTERVAL = timedelta(seconds=60)
+# Fast sections (visit/clean records, waste bin, online) on every poll. A live
+# push showing a clean or level finished also triggers a poll right away.
+DEFAULT_UPDATE_INTERVAL = timedelta(minutes=5)
+# Slow sections (device list, settings, deodorant, cats) at most this often.
+SLOW_UPDATE_INTERVAL = timedelta(minutes=30)
+# After a live push shows a clean/level finished, wait this long (for the
+# server to store its record) and then poll.
+FINISHED_REFRESH_DELAY = timedelta(seconds=15)
 
 # Records fetched per box per poll (each of cat visits and device events).
-# Enough that a busy minute between polls doesn't drop events.
-RECORDS_PER_POLL = 10
+# Enough that a busy stretch between polls doesn't drop events.
+RECORDS_PER_POLL = 20

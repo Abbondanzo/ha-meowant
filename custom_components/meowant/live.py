@@ -29,6 +29,7 @@ from .const import (
     LIVE_POLL_INTERVAL,
     LIVE_RETRY_MAX,
     LIVE_RETRY_MIN,
+    LIVE_STABLE_AFTER,
     LIVE_STATE_MAX_AGE,
 )
 from .im import MeowantImSession
@@ -47,11 +48,14 @@ class MeowantLive:
         entry: ConfigEntry,
         api: MeowantApiClient,
         serials: Callable[[], list[str]],
+        on_finished: Callable[[str], None],
     ) -> None:
         self._hass = hass
         self._entry = entry
         self._api = api
         self._serials = serials
+        # Called with a box's serial when it goes from working back to idle.
+        self._on_finished = on_finished
         self.signal = f"{DOMAIN}_{entry.entry_id}_live"
         self._session: MeowantImSession | None = None
         self._states: dict[str, tuple[WorkState, float]] = {}  # serial -> (state, monotonic time received)
@@ -101,10 +105,11 @@ class MeowantLive:
         delay = LIVE_RETRY_MIN.total_seconds()
         while True:
             session = MeowantImSession(self._api, ssl_context=client_context(), on_state=self._on_state)
+            connected_at: float | None = None
             try:
                 await session.connect()
                 _LOGGER.debug("Live connection up")
-                delay = LIVE_RETRY_MIN.total_seconds()
+                connected_at = time.monotonic()
                 self._session = session
                 self._notify()
                 await self._serve(session)
@@ -119,6 +124,11 @@ class MeowantLive:
                 self._session = None
                 await session.close()
                 self._notify()
+            # Only a connection that held up resets the backoff. One that's dropped
+            # right after connecting (e.g. another client taking over the session)
+            # must not turn into a reconnect, and two REST calls, every 30 s.
+            if connected_at is not None and time.monotonic() - connected_at >= LIVE_STABLE_AFTER.total_seconds():
+                delay = LIVE_RETRY_MIN.total_seconds()
             await asyncio.sleep(delay)
             delay = min(delay * 2, LIVE_RETRY_MAX.total_seconds())
 
@@ -135,7 +145,9 @@ class MeowantLive:
 
     async def _poll(self, session: MeowantImSession) -> None:
         while True:
-            for serial in self._serials():
+            # Only boxes in the IM contacts: asking for one that isn't would make
+            # the session re-fetch the contact list over REST on every poll.
+            for serial in (s for s in self._serials() if s in session.contacts):
                 try:
                     await session.request_state(serial)
                 except (MeowantApiError, MqttError) as err:
@@ -146,8 +158,11 @@ class MeowantLive:
 
     @callback
     def _on_state(self, serial: str, state: WorkState) -> None:
+        previous = self._states.get(serial)
         self._states[serial] = (state, time.monotonic())
         self._notify()
+        if previous is not None and not previous[0].is_idle and state.is_idle:
+            self._on_finished(serial)
 
     @callback
     def _notify(self) -> None:

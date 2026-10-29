@@ -341,6 +341,10 @@ Because proto3 omits zero fields, a box that's idle with every sub-state at 0 sh
 
 `im_proto.py` (encoding), `mqtt.py` (a minimal MQTT 3.1.1 client: no paho-mqtt dependency) and `im.py` (the session) implement the above. The HA integration's `live.py` keeps **one persistent connection per config entry**, not one per command as upet-hass does. So `im/login` runs once per connection, not on every poll. State comes mainly from the box's `0x400` pushes. An all-state request every 60 s is a backstop that also gets the state right after connecting. It reconnects with backoff (30 s doubling to 15 min) and stops for good on auth/lockout errors, so it never adds password logins toward the lockout.
 
+### Rate limiting
+
+On 2026-10-29 the server stopped answering one home IP entirely, the official app on the same Wi-Fi included: TCP to `47.89.209.147:443` connects, then the TLS ClientHello gets no reply (curl times out mid-handshake). The IP had been running this integration at 8 REST requests/minute for a week, plus a day of dev-console testing and the first MQTT connections. The trigger and how long the block lasts aren't known. The integration now aims for about 60 requests/hour (see CHANGELOG 0.2.1).
+
 ### Open questions
 
 Answered on 2026-10-28: the Meowant tenant accepts all of this as-is; replies use attr 2 and pushes attr 6; the box pushes state on every change, including a clean finishing by itself; a **shared** account can send operations; receipts carry the acknowledged message's `cid`.

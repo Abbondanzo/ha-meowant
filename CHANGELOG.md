@@ -2,6 +2,16 @@
 
 Format based on [Keep a Changelog](https://keepachangelog.com/). Version numbers track `custom_components/meowant/manifest.json`.
 
+## [0.2.1] - 2026-10-29
+
+Far fewer requests to Meowant's cloud, after it blocked a home connection entirely (the app included) for a while.
+
+### Changed
+- Cat visits, cleans, waste bin and online status refresh every 5 minutes instead of every minute. The device list, settings and deodorant refresh every 30 minutes. When a clean or level finishes, the integration refreshes right away, so new visits and cleans still show up promptly. About 60 requests an hour instead of 480.
+- The login token is saved and reused, so Home Assistant restarts and setup retries no longer log in again.
+- If Meowant's server can't be reached, a refresh stops at the first failed connection instead of trying every request.
+- The live connection checks the box's state every 15 minutes instead of every minute (the box reports changes itself). After a connection drops, it reconnects with a growing delay unless that connection had stayed up for 10 minutes; before, a connection that kept dropping was retried every 30 seconds.
+
 ## [0.2.0] - 2026-10-28
 
 Live state and commands over Meowant's MQTT (IM) channel.
